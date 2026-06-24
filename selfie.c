@@ -99,7 +99,7 @@ void exit(int code);
 
 uint64_t read(uint64_t fd, uint64_t* buffer, uint64_t bytes_to_read);
 uint64_t write(uint64_t fd, uint64_t* buffer, uint64_t bytes_to_write);
-
+uint64_t lseek(uint64_t fd, uint64_t offset, uint64_t whence); // cambio_4
 // selfie bootstraps char to uint64_t and ignores ellipsis!
 uint64_t open(char* filename, uint64_t flags, ...);
 int fork();
@@ -1308,6 +1308,10 @@ uint64_t SYSCALL_BRK    = 214;
 uint64_t SYSCALL_FORK	= 215;
 uint64_t SYSCALL_WAIT	= 216;
 
+uint64_t LSEEK_SET = 0;
+uint64_t LSEEK_CUR = 1;
+// cambio_4
+
 /* DIRFD_AT_FDCWD corresponds to AT_FDCWD in fcntl.h and
    is passed as first argument of the openat system call
    emulating the (in Linux) deprecated open system call. */
@@ -2233,7 +2237,7 @@ void unblock_context(uint64_t* context);
 // extended in the symbolic execution engine and the Boehm garbage collector
 
 // agregar más entries por el mmaping; 
-uint64_t CONTEXTENTRIES = 39; // cambio_1
+uint64_t CONTEXTENTRIES = 38; // cambio_1
 uint64_t N_CONTEXTS = 0;
 uint64_t* RUNNING = (uint64_t*) 0;
 uint64_t N_BLOCKED_CONTEXTS = 0;
@@ -2254,7 +2258,133 @@ uint64_t* allocate_context() {
 uint64_t next_context(uint64_t* context)    { return (uint64_t) context; }
 uint64_t prev_context(uint64_t* context)    { return (uint64_t) (context + 1); }
 uint64_t program_counter(uint64_t* context) { return (uint64_t) (context + 2); }
-uint64_t regs(uint64_t* context)            { return (uint64_t) (context + 3); }
+uint64_t regs(uint64_t* context)            { return (uint64_t) (context + 3); }// -----------------------------------------------------------------
+// ----------------------- FILE IDENTIFIERS ------------------------
+// -----------------------------------------------------------------
+
+uint64_t FDFILEENTRIES = 4;
+
+uint64_t* fd_file_table = (uint64_t*) 0;
+uint64_t next_mmap_file_id = 1;
+
+// fd-file entry
+// +---+----------+
+// | 0 | next     |
+// | 1 | fd       |
+// | 2 | file id  |
+// | 3 | filename |
+// +---+----------+
+
+uint64_t* allocate_fd_file_entry() {
+  return zmalloc(FDFILEENTRIES * sizeof(uint64_t));
+}
+
+uint64_t* get_next_fd_file_entry(uint64_t* entry) {
+  return (uint64_t*) *entry;
+}
+
+uint64_t get_fd_file_fd(uint64_t* entry) {
+  return *(entry + 1);
+}
+
+uint64_t get_fd_file_id(uint64_t* entry) {
+  return *(entry + 2);
+}
+
+char* get_fd_file_name(uint64_t* entry) {
+  return (char*) *(entry + 3);
+}
+
+void set_next_fd_file_entry(uint64_t* entry, uint64_t* next) {
+  *entry = (uint64_t) next;
+}
+
+void set_fd_file_fd(uint64_t* entry, uint64_t fd) {
+  *(entry + 1) = fd;
+}
+
+void set_fd_file_id(uint64_t* entry, uint64_t file_id) {
+  *(entry + 2) = file_id;
+}
+
+void set_fd_file_name(uint64_t* entry, char* name) {
+  *(entry + 3) = (uint64_t) name;
+}
+
+uint64_t* find_fd_file_entry(uint64_t fd) {
+  uint64_t* entry;
+
+  entry = fd_file_table;
+
+  while (entry != (uint64_t*) 0) {
+    if (get_fd_file_fd(entry) == fd)
+      return entry;
+
+    entry = get_next_fd_file_entry(entry);
+  }
+
+  return (uint64_t*) 0;
+}
+
+uint64_t find_file_id_by_name(char* name) {
+  uint64_t* entry;
+
+  entry = fd_file_table;
+
+  while (entry != (uint64_t*) 0) {
+    if (string_compare(get_fd_file_name(entry), name))
+      return get_fd_file_id(entry);
+
+    entry = get_next_fd_file_entry(entry);
+  }
+
+  return 0;
+}
+
+uint64_t get_or_create_file_id(char* name) {
+  uint64_t file_id;
+
+  file_id = find_file_id_by_name(name);
+
+  if (file_id == 0) {
+    file_id = next_mmap_file_id;
+    next_mmap_file_id = next_mmap_file_id + 1;
+  }
+
+  return file_id;
+}
+
+void record_fd_file(uint64_t fd, char* name) {
+  uint64_t* entry;
+  uint64_t file_id;
+
+  file_id = get_or_create_file_id(name);
+
+  entry = find_fd_file_entry(fd);
+
+  if (entry == (uint64_t*) 0) {
+    entry = allocate_fd_file_entry();
+
+    set_next_fd_file_entry(entry, fd_file_table);
+
+    fd_file_table = entry;
+  }
+
+  set_fd_file_fd(entry, fd);
+  set_fd_file_id(entry, file_id);
+  set_fd_file_name(entry, string_copy(name));
+}
+
+uint64_t get_file_id_from_fd(uint64_t fd) {
+  uint64_t* entry;
+
+  entry = find_fd_file_entry(fd);
+
+  if (entry != (uint64_t*) 0)
+    return get_fd_file_id(entry);
+  else
+    return 0;
+}
 uint64_t page_table(uint64_t* context)      { return (uint64_t) (context + 4); }
 uint64_t lowest_lo_page(uint64_t* context)  { return (uint64_t) (context + 5); }
 uint64_t highest_lo_page(uint64_t* context) { return (uint64_t) (context + 6); }
@@ -2333,7 +2463,7 @@ uint64_t get_status(uint64_t* context) { return *(context + 34); }
 uint64_t get_nchildren(uint64_t* context) { return *(context + 35); }
 uint64_t get_child_exit_code(uint64_t* context) { return *(context + 36); }
 uint64_t get_child_pid (uint64_t* context) { return *(context + 37); }
-uint64_t get_mapping(uint64_t* context) { return *(context + 38); } // cambio_2
+uint64_t get_mappings(uint64_t* context) { return *(context + 38); } // cambio_2
 
 void set_next_context(uint64_t* context, uint64_t* next)     { *context        = (uint64_t) next; }
 void set_prev_context(uint64_t* context, uint64_t* prev)     { *(context + 1)  = (uint64_t) prev; }
@@ -2375,7 +2505,7 @@ void set_status(uint64_t* context, uint64_t status) { *(context + 34) = status; 
 void set_nchildren(uint64_t* context, uint64_t nchildren) { *(context + 35) = nchildren; }
 void set_child_exit_code(uint64_t* context, uint64_t exit_code) { *(context + 36) = exit_code; }
 void set_child_pid(uint64_t* context, uint64_t child_pid) { *(context + 37) = child_pid; }
-void set_mapping(uint64_t* context, uint64_t* mapping) { *(context + 38) = (uint64_t) mapping; } // cambio_2
+void set_mappings(uint64_t* context, uint64_t* mappings) { *(context + 38) = (uint64_t) mappings; } // cambio_2
 // -----------------------------------------------------------------
 // -------------------------- MICROKERNEL --------------------------
 // -----------------------------------------------------------------
@@ -2437,6 +2567,10 @@ uint64_t pused();
 
 uint64_t* palloc();
 void      pfree(uint64_t* frame);
+
+//-------
+uint64_t read_file_page_into_frame(uint64_t fd, uint64_t file_offset, uint64_t* frame);
+uint64_t get_or_create_cache_frame(uint64_t file_id, uint64_t file_offset, uint64_t fd); // cambio_6
 
 void map_and_store(uint64_t* context, uint64_t vaddr, uint64_t data);
 
@@ -7866,6 +8000,7 @@ void implement_openat(uint64_t* context) {
   uint64_t vfilename;
   uint64_t flags;
   uint64_t mode;
+  uint64_t opened_fd; // cambio_5
 
   if (debug_syscalls) {
     printf("(openat): ");
@@ -7895,7 +8030,12 @@ void implement_openat(uint64_t* context) {
       // use correct flags for host operating system
       flags = O_CREAT_TRUNC_WRONLY;
 
-    *(get_regs(context) + REG_A0) = open(filename_buffer, flags, mode);
+      //--------
+    opened_fd = open(filename_buffer, flags, mode);
+    *(get_regs(context) + REG_A0) = opened_fd;
+    if (opened_fd != (uint64_t) -1)
+    record_fd_file(opened_fd, filename_buffer); // cambio_5
+
   } else
     *(get_regs(context) + REG_A0) = sign_shrink(-1, SYSCALL_BITWIDTH);
 
@@ -11382,7 +11522,7 @@ uint64_t MAPPINGENTRIES = 7; // cambio_3
 // +---+----------+
 
 uint64_t* allocate_mapping_entry() {
-  return zmalloc(MAPPINGENTRIES * sizeof(uint64_t));
+  return zmalloc(MAPPINGENTRIES * sizeof(uint64_t)); // inicializa todos los campos de un mapping en 0
 }
 
 uint64_t* get_next_mapping(uint64_t* mapping) {
@@ -11412,9 +11552,10 @@ uint64_t get_mapping_file_id(uint64_t* mapping) {
 uint64_t get_mapping_offset(uint64_t* mapping) {
   return *(mapping + 6);
 }
+// se obtienen elementos de la lista de mapeos de memoria de un contexto
 
 void set_next_mapping(uint64_t* mapping, uint64_t* next) {
-  *mapping = (uint64_t) next;
+  *mapping = (uint64_t) next; // esto hace que el primer elemento de la lista de mapeos de memoria de un contexto apunte al siguiente mapping
 }
 
 void set_mapping_addr(uint64_t* mapping, uint64_t addr) {
@@ -11425,7 +11566,7 @@ void set_mapping_length(uint64_t* mapping, uint64_t length) {
   *(mapping + 2) = length;
 }
 
-void set_mapping_prot(uint64_t* mapping, uint64_t prot) {
+void set_mapping_prot(uint64_t* mapping, uint64_t prot) { 
   *(mapping + 3) = prot;
 }
 
@@ -11440,6 +11581,7 @@ void set_mapping_file_id(uint64_t* mapping, uint64_t file_id) {
 void set_mapping_offset(uint64_t* mapping, uint64_t offset) {
   *(mapping + 6) = offset;
 }
+// para modificar los campos de un mapping
 
 uint64_t* create_mapping_entry(uint64_t addr,
                                uint64_t length,
@@ -11468,6 +11610,263 @@ void add_mapping(uint64_t* context, uint64_t* mapping) {
 }
 
 //////////////////////////////////////////////////////////////////////////
+
+uint64_t* find_mapping_by_addr(uint64_t* context, uint64_t addr) {
+  uint64_t* mapping;
+
+  mapping = get_mappings(context);
+
+  while (mapping != (uint64_t*) 0) {
+    if (get_mapping_addr(mapping) == addr)
+      return mapping;
+
+    mapping = get_next_mapping(mapping);
+  }
+
+  return (uint64_t*) 0;
+}
+
+uint64_t* find_mapping_containing_address(uint64_t* context, uint64_t vaddr) {
+  uint64_t* mapping;
+  uint64_t start;
+  uint64_t end;
+
+  mapping = get_mappings(context);
+
+  while (mapping != (uint64_t*) 0) {
+    start = get_mapping_addr(mapping);
+    end   = start + get_mapping_length(mapping);
+
+    if (vaddr >= start)
+      if (vaddr < end)
+        return mapping;
+
+    mapping = get_next_mapping(mapping);
+  }
+
+  return (uint64_t*) 0;
+}
+
+uint64_t is_mapped_address(uint64_t* context, uint64_t vaddr) {
+  if (find_mapping_containing_address(context, vaddr) != (uint64_t*) 0)
+    return 1;
+  else
+    return 0;
+}
+// ----------------------------------------------------------------------------------------------------------------------------------
+// -----------------------------------------------------------------
+// --------------------------- PAGE CACHE --------------------------
+// -----------------------------------------------------------------
+
+uint64_t PAGECACHEENTRIES = 4;
+
+uint64_t* page_cache = (uint64_t*) 0;
+
+// page cache entry
+// +---+-------------+
+// | 0 | next        |
+// | 1 | file id     |
+// | 2 | file offset |
+// | 3 | frame       |
+// +---+-------------+
+
+uint64_t* allocate_page_cache_entry() {
+  return zmalloc(PAGECACHEENTRIES * sizeof(uint64_t));
+}
+
+uint64_t* get_next_page_cache_entry(uint64_t* entry) {
+  return (uint64_t*) *entry;
+}
+
+uint64_t get_page_cache_file_id(uint64_t* entry) {
+  return *(entry + 1);
+}
+
+uint64_t get_page_cache_file_offset(uint64_t* entry) {
+  return *(entry + 2);
+}
+
+uint64_t get_page_cache_frame(uint64_t* entry) {
+  return *(entry + 3);
+}
+
+void set_next_page_cache_entry(uint64_t* entry, uint64_t* next) {
+  *entry = (uint64_t) next;
+}
+
+void set_page_cache_file_id(uint64_t* entry, uint64_t file_id) {
+  *(entry + 1) = file_id;
+}
+
+void set_page_cache_file_offset(uint64_t* entry, uint64_t file_offset) {
+  *(entry + 2) = file_offset;
+}
+
+void set_page_cache_frame(uint64_t* entry, uint64_t frame) {
+  *(entry + 3) = frame;
+}
+
+uint64_t* find_page_cache_entry(uint64_t file_id, uint64_t file_offset) {
+  uint64_t* entry;
+
+  entry = page_cache;
+
+  while (entry != (uint64_t*) 0) {
+    if (get_page_cache_file_id(entry) == file_id)
+      if (get_page_cache_file_offset(entry) == file_offset)
+        return entry;
+
+    entry = get_next_page_cache_entry(entry);
+  }
+
+  return (uint64_t*) 0;
+}
+
+uint64_t* create_page_cache_entry(uint64_t file_id,
+                                  uint64_t file_offset,
+                                  uint64_t frame) {
+  uint64_t* entry;
+
+  entry = allocate_page_cache_entry();
+
+  set_next_page_cache_entry(entry, page_cache);
+  set_page_cache_file_id(entry, file_id);
+  set_page_cache_file_offset(entry, file_offset);
+  set_page_cache_frame(entry, frame);
+
+  page_cache = entry;
+
+  return entry;
+}
+////////////////////////////////////////////////////////////////////////////////
+// -----------------------------------------------------------------
+// ----------------------- FILE IDENTIFIERS ------------------------
+// -----------------------------------------------------------------
+
+uint64_t FDFILEENTRIES = 4;
+
+uint64_t* fd_file_table = (uint64_t*) 0;
+uint64_t next_mmap_file_id = 1;
+
+// fd-file entry
+// +---+----------+
+// | 0 | next     |
+// | 1 | fd       |
+// | 2 | file id  |
+// | 3 | filename |
+// +---+----------+
+
+uint64_t* allocate_fd_file_entry() {
+  return zmalloc(FDFILEENTRIES * sizeof(uint64_t));
+}
+
+uint64_t* get_next_fd_file_entry(uint64_t* entry) {
+  return (uint64_t*) *entry;
+}
+
+uint64_t get_fd_file_fd(uint64_t* entry) {
+  return *(entry + 1);
+}
+
+uint64_t get_fd_file_id(uint64_t* entry) {
+  return *(entry + 2);
+}
+
+char* get_fd_file_name(uint64_t* entry) {
+  return (char*) *(entry + 3);
+}
+
+void set_next_fd_file_entry(uint64_t* entry, uint64_t* next) {
+  *entry = (uint64_t) next;
+}
+
+void set_fd_file_fd(uint64_t* entry, uint64_t fd) {
+  *(entry + 1) = fd;
+}
+
+void set_fd_file_id(uint64_t* entry, uint64_t file_id) {
+  *(entry + 2) = file_id;
+}
+
+void set_fd_file_name(uint64_t* entry, char* name) {
+  *(entry + 3) = (uint64_t) name;
+}
+
+uint64_t* find_fd_file_entry(uint64_t fd) {
+  uint64_t* entry;
+
+  entry = fd_file_table;
+
+  while (entry != (uint64_t*) 0) {
+    if (get_fd_file_fd(entry) == fd)
+      return entry;
+
+    entry = get_next_fd_file_entry(entry);
+  }
+
+  return (uint64_t*) 0;
+}
+
+uint64_t find_file_id_by_name(char* name) {
+  uint64_t* entry;
+
+  entry = fd_file_table;
+
+  while (entry != (uint64_t*) 0) {
+    if (string_compare(get_fd_file_name(entry), name))
+      return get_fd_file_id(entry);
+
+    entry = get_next_fd_file_entry(entry);
+  }
+
+  return 0;
+}
+
+uint64_t get_or_create_file_id(char* name) {
+  uint64_t file_id;
+
+  file_id = find_file_id_by_name(name);
+
+  if (file_id == 0) {
+    file_id = next_mmap_file_id;
+    next_mmap_file_id = next_mmap_file_id + 1;
+  }
+
+  return file_id;
+}
+
+void record_fd_file(uint64_t fd, char* name) {
+  uint64_t* entry;
+  uint64_t file_id;
+
+  file_id = get_or_create_file_id(name);
+
+  entry = find_fd_file_entry(fd);
+
+  if (entry == (uint64_t*) 0) {
+    entry = allocate_fd_file_entry();
+
+    set_next_fd_file_entry(entry, fd_file_table);
+
+    fd_file_table = entry;
+  }
+
+  set_fd_file_fd(entry, fd);
+  set_fd_file_id(entry, file_id);
+  set_fd_file_name(entry, string_copy(name));
+}
+
+uint64_t get_file_id_from_fd(uint64_t fd) {
+  uint64_t* entry;
+
+  entry = find_fd_file_entry(fd);
+
+  if (entry != (uint64_t*) 0)
+    return get_fd_file_id(entry);
+  else
+    return 0;
+}
+///////////////////////////////////////////////////////////////////////////////
 uint64_t* create_context(uint64_t* parent, uint64_t* vctxt) {
   uint64_t* context;
 
@@ -11825,11 +12224,62 @@ uint64_t* palloc() {
   return touch((uint64_t*) frame, PAGESIZE * double_for_single_word);
 }
 
-void pfree(uint64_t* frame) {
+void pfree(uint64_t* frame) { // cambio_7
   // TODO: implement free list of page frames
   frame = frame + 1;
 }
 
+uint64_t read_file_page_into_frame(uint64_t fd, uint64_t file_offset, uint64_t* frame) {
+  uint64_t current_offset;
+  uint64_t bytes_read;
+
+  // Si el archivo tiene menos de una página, el resto queda en cero.
+  zero_memory(frame, PAGESIZE);
+
+  // Guardamos el offset actual del archivo para no romper futuros read/write.
+  current_offset = lseek(fd, 0, LSEEK_CUR);
+
+  if (current_offset == (uint64_t) -1)
+    return 0;
+
+  // Nos movemos al offset de la página del archivo.
+  if (lseek(fd, file_offset, LSEEK_SET) == (uint64_t) -1) {
+    lseek(fd, current_offset, LSEEK_SET);
+
+    return 0;
+  }
+
+  // Leemos hasta PAGESIZE bytes dentro del cache frame.
+  bytes_read = read(fd, frame, PAGESIZE);
+
+  // Restauramos el offset original del archivo.
+  lseek(fd, current_offset, LSEEK_SET);
+
+  if (bytes_read == (uint64_t) -1)
+    return 0;
+
+  return 1;
+}
+
+uint64_t get_or_create_cache_frame(uint64_t file_id, uint64_t file_offset, uint64_t fd) {
+  uint64_t* entry;
+  uint64_t* frame;
+
+  entry = find_page_cache_entry(file_id, file_offset);
+
+  if (entry != (uint64_t*) 0)
+    return get_page_cache_frame(entry);
+
+  frame = palloc();
+
+  if (read_file_page_into_frame(fd, file_offset, frame) == 0)
+    return 0;
+
+  create_page_cache_entry(file_id, file_offset, (uint64_t) frame);
+
+  return (uint64_t) frame;
+}
+//////////////////////////////////////////////////////////////////////////77
 void map_and_store(uint64_t* context, uint64_t vaddr, uint64_t data) {
   // assert: is_virtual_address_valid(vaddr, WORDSIZE) == 1
 
