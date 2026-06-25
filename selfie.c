@@ -12248,7 +12248,7 @@ uint64_t is_page_aligned(uint64_t value) {
     return 1;
   else
     return 0;
-}
+} // nos ayuda a verifica que la dirección virtual que estamos devolviendo para mapping se encuetre al tamaño de la pagina.
 
 uint64_t ranges_overlap(uint64_t start1, uint64_t length1,
                         uint64_t start2, uint64_t length2) {
@@ -12263,9 +12263,8 @@ uint64_t ranges_overlap(uint64_t start1, uint64_t length1,
       return 1;
 
   return 0;
-}
+} // nos ayuda a verificar si hay un choque entre la direccion virtual del mapping actual con la de otro mapping existente
 
-// verificamos que la dirección virtual que estamos devolviendo no choque con otro mapping
 uint64_t is_mmap_range_free(uint64_t* context, uint64_t addr, uint64_t length) {
   uint64_t* mapping;
   uint64_t vaddr;
