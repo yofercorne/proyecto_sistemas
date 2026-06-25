@@ -2258,133 +2258,7 @@ uint64_t* allocate_context() {
 uint64_t next_context(uint64_t* context)    { return (uint64_t) context; }
 uint64_t prev_context(uint64_t* context)    { return (uint64_t) (context + 1); }
 uint64_t program_counter(uint64_t* context) { return (uint64_t) (context + 2); }
-uint64_t regs(uint64_t* context)            { return (uint64_t) (context + 3); }// -----------------------------------------------------------------
-// ----------------------- FILE IDENTIFIERS ------------------------
-// -----------------------------------------------------------------
-
-uint64_t FDFILEENTRIES = 4;
-
-uint64_t* fd_file_table = (uint64_t*) 0;
-uint64_t next_mmap_file_id = 1;
-
-// fd-file entry
-// +---+----------+
-// | 0 | next     |
-// | 1 | fd       |
-// | 2 | file id  |
-// | 3 | filename |
-// +---+----------+
-
-uint64_t* allocate_fd_file_entry() {
-  return zmalloc(FDFILEENTRIES * sizeof(uint64_t));
-}
-
-uint64_t* get_next_fd_file_entry(uint64_t* entry) {
-  return (uint64_t*) *entry;
-}
-
-uint64_t get_fd_file_fd(uint64_t* entry) {
-  return *(entry + 1);
-}
-
-uint64_t get_fd_file_id(uint64_t* entry) {
-  return *(entry + 2);
-}
-
-char* get_fd_file_name(uint64_t* entry) {
-  return (char*) *(entry + 3);
-}
-
-void set_next_fd_file_entry(uint64_t* entry, uint64_t* next) {
-  *entry = (uint64_t) next;
-}
-
-void set_fd_file_fd(uint64_t* entry, uint64_t fd) {
-  *(entry + 1) = fd;
-}
-
-void set_fd_file_id(uint64_t* entry, uint64_t file_id) {
-  *(entry + 2) = file_id;
-}
-
-void set_fd_file_name(uint64_t* entry, char* name) {
-  *(entry + 3) = (uint64_t) name;
-}
-
-uint64_t* find_fd_file_entry(uint64_t fd) {
-  uint64_t* entry;
-
-  entry = fd_file_table;
-
-  while (entry != (uint64_t*) 0) {
-    if (get_fd_file_fd(entry) == fd)
-      return entry;
-
-    entry = get_next_fd_file_entry(entry);
-  }
-
-  return (uint64_t*) 0;
-}
-
-uint64_t find_file_id_by_name(char* name) {
-  uint64_t* entry;
-
-  entry = fd_file_table;
-
-  while (entry != (uint64_t*) 0) {
-    if (string_compare(get_fd_file_name(entry), name))
-      return get_fd_file_id(entry);
-
-    entry = get_next_fd_file_entry(entry);
-  }
-
-  return 0;
-}
-
-uint64_t get_or_create_file_id(char* name) {
-  uint64_t file_id;
-
-  file_id = find_file_id_by_name(name);
-
-  if (file_id == 0) {
-    file_id = next_mmap_file_id;
-    next_mmap_file_id = next_mmap_file_id + 1;
-  }
-
-  return file_id;
-}
-
-void record_fd_file(uint64_t fd, char* name) {
-  uint64_t* entry;
-  uint64_t file_id;
-
-  file_id = get_or_create_file_id(name);
-
-  entry = find_fd_file_entry(fd);
-
-  if (entry == (uint64_t*) 0) {
-    entry = allocate_fd_file_entry();
-
-    set_next_fd_file_entry(entry, fd_file_table);
-
-    fd_file_table = entry;
-  }
-
-  set_fd_file_fd(entry, fd);
-  set_fd_file_id(entry, file_id);
-  set_fd_file_name(entry, string_copy(name));
-}
-
-uint64_t get_file_id_from_fd(uint64_t fd) {
-  uint64_t* entry;
-
-  entry = find_fd_file_entry(fd);
-
-  if (entry != (uint64_t*) 0)
-    return get_fd_file_id(entry);
-  else
-    return 0;
-}
+uint64_t regs(uint64_t* context)            { return (uint64_t) (context + 3); }
 uint64_t page_table(uint64_t* context)      { return (uint64_t) (context + 4); }
 uint64_t lowest_lo_page(uint64_t* context)  { return (uint64_t) (context + 5); }
 uint64_t highest_lo_page(uint64_t* context) { return (uint64_t) (context + 6); }
@@ -11522,7 +11396,7 @@ uint64_t MAPPINGENTRIES = 7; // cambio_3
 // +---+----------+
 
 uint64_t* allocate_mapping_entry() {
-  return zmalloc(MAPPINGENTRIES * sizeof(uint64_t)); // inicializa todos los campos de un mapping en 0
+  return zmalloc(MAPPINGENTRIES * sizeof(uint64_t)); // inicializa todos los campos de un mapping en 0, al mismo tiempo que se hace un malloc de 7*8 bytes, ya que cada campo es un uint64_t
 }
 
 uint64_t* get_next_mapping(uint64_t* mapping) {
@@ -11623,10 +11497,10 @@ uint64_t* find_mapping_by_addr(uint64_t* context, uint64_t addr) {
     mapping = get_next_mapping(mapping);
   }
 
-  return (uint64_t*) 0;
+  return (uint64_t*) 0; // dentro de la lista de mmapings, devuelve el mapping con addres igual al solicitado
 }
 
-uint64_t* find_mapping_containing_address(uint64_t* context, uint64_t vaddr) {
+uint64_t* find_mapping_containing_address(uint64_t* context, uint64_t vaddr) { // este busca si la direccion virtual vaddr esta dentro de algun mapping de la lista de mapeos de memoria del contexto
   uint64_t* mapping;
   uint64_t start;
   uint64_t end;
@@ -11647,12 +11521,23 @@ uint64_t* find_mapping_containing_address(uint64_t* context, uint64_t vaddr) {
   return (uint64_t*) 0;
 }
 
-uint64_t is_mapped_address(uint64_t* context, uint64_t vaddr) {
+uint64_t is_mapped_address(uint64_t* context, uint64_t vaddr) { // este devuelve 1 si la direccion virtual vaddr esta dentro de algun mapping de la lista de mapeos de memoria del contexto, y 0 si no lo esta
   if (find_mapping_containing_address(context, vaddr) != (uint64_t*) 0)
     return 1;
   else
     return 0;
-}
+} // 
+
+/*
+estas funciones nos sirven para luego implementar todas estas cosas
+mmap    -> agregar mapping
+munmap  -> buscar mapping por addr inicial y eliminarlo
+msync   -> buscar mapping por addr inicial y escribir al archivo
+load/store -> permitir accesos dentro de mappings
+fork    -> saber qué páginas pertenecen a mappings compartidos
+
+*/
+
 // ----------------------------------------------------------------------------------------------------------------------------------
 // -----------------------------------------------------------------
 // --------------------------- PAGE CACHE --------------------------
@@ -11660,7 +11545,8 @@ uint64_t is_mapped_address(uint64_t* context, uint64_t vaddr) {
 
 uint64_t PAGECACHEENTRIES = 4;
 
-uint64_t* page_cache = (uint64_t*) 0;
+uint64_t* page_cache = (uint64_t*) 0; // cabeza de la lisa global, ya que la tabla es único para todos los procesos.
+// podemos lograr saber la página del archivo 3 en offset 4096 está guardada en el frame 0x800000
 
 // page cache entry
 // +---+-------------+
@@ -11672,7 +11558,7 @@ uint64_t* page_cache = (uint64_t*) 0;
 
 uint64_t* allocate_page_cache_entry() {
   return zmalloc(PAGECACHEENTRIES * sizeof(uint64_t));
-}
+} // reservamos memoria para una entrada de la cache de paginas, que tiene 4 campos, cada uno de 8 bytes (uint64_t)
 
 uint64_t* get_next_page_cache_entry(uint64_t* entry) {
   return (uint64_t*) *entry;
@@ -11689,6 +11575,7 @@ uint64_t get_page_cache_file_offset(uint64_t* entry) {
 uint64_t get_page_cache_frame(uint64_t* entry) {
   return *(entry + 3);
 }
+// obtener valores del page cache
 
 void set_next_page_cache_entry(uint64_t* entry, uint64_t* next) {
   *entry = (uint64_t) next;
@@ -11705,6 +11592,7 @@ void set_page_cache_file_offset(uint64_t* entry, uint64_t file_offset) {
 void set_page_cache_frame(uint64_t* entry, uint64_t frame) {
   *(entry + 3) = frame;
 }
+// modificar valores del page cache
 
 uint64_t* find_page_cache_entry(uint64_t file_id, uint64_t file_offset) {
   uint64_t* entry;
@@ -11717,7 +11605,7 @@ uint64_t* find_page_cache_entry(uint64_t file_id, uint64_t file_offset) {
         return entry;
 
     entry = get_next_page_cache_entry(entry);
-  }
+  } // busca si el mismo page caché entry ya existe, si es así lo devuelve, sino devuelve 0
 
   return (uint64_t*) 0;
 }
@@ -11745,8 +11633,8 @@ uint64_t* create_page_cache_entry(uint64_t file_id,
 
 uint64_t FDFILEENTRIES = 4;
 
-uint64_t* fd_file_table = (uint64_t*) 0;
-uint64_t next_mmap_file_id = 1;
+uint64_t* fd_file_table = (uint64_t*) 0; // cabeza de la lista global, ya que la tabla es única para todos los procesos.
+uint64_t next_mmap_file_id = 1; // el próximo ID de archivo mmap a asignar
 
 // fd-file entry
 // +---+----------+
@@ -11790,9 +11678,10 @@ void set_fd_file_id(uint64_t* entry, uint64_t file_id) {
 
 void set_fd_file_name(uint64_t* entry, char* name) {
   *(entry + 3) = (uint64_t) name;
-}
+} 
 
-uint64_t* find_fd_file_entry(uint64_t fd) {
+uint64_t* find_fd_file_entry(uint64_t fd) { // fd representa el file descriptor, el cual basicamente es un número entero que identifica de manera única un archivo abierto en un proceso.
+  // a diferencia del file id, el cual es un identificador único para un archivo en el sistema de archivos, y no cambia aunque se cierre y se vuelva a abrir el archivo
   uint64_t* entry;
 
   entry = fd_file_table;
@@ -11807,7 +11696,7 @@ uint64_t* find_fd_file_entry(uint64_t fd) {
   return (uint64_t*) 0;
 }
 
-uint64_t find_file_id_by_name(char* name) {
+uint64_t find_file_id_by_name(char* name) { // sirve porque si otro proceso abre el mismo archivo, se le asigna el mismo file id, ya que el file id es único para cada archivo en el sistema de archivos, mientras que el fd es único para cada proceso y puede cambiar si se cierra y se vuelve a abrir el archivo
   uint64_t* entry;
 
   entry = fd_file_table;
@@ -11835,7 +11724,7 @@ uint64_t get_or_create_file_id(char* name) {
   return file_id;
 }
 
-void record_fd_file(uint64_t fd, char* name) {
+void record_fd_file(uint64_t fd, char* name) { // sirve para registrar que un fd (file descriptor) está asociado a un archivo con un nombre específico. 
   uint64_t* entry;
   uint64_t file_id;
 
@@ -11856,7 +11745,7 @@ void record_fd_file(uint64_t fd, char* name) {
   set_fd_file_name(entry, string_copy(name));
 }
 
-uint64_t get_file_id_from_fd(uint64_t fd) {
+uint64_t get_file_id_from_fd(uint64_t fd) { // dado un file descriptor (fd), esta función busca en la tabla de archivos abiertos (fd_file_table) para encontrar la entrada correspondiente a ese fd y devuelve el identificador único del archivo (file id) asociado a ese fd. Si no se encuentra ninguna entrada para el fd dado, devuelve 0.
   uint64_t* entry;
 
   entry = find_fd_file_entry(fd);
@@ -11866,6 +11755,7 @@ uint64_t get_file_id_from_fd(uint64_t fd) {
   else
     return 0;
 }
+
 ///////////////////////////////////////////////////////////////////////////////
 uint64_t* create_context(uint64_t* parent, uint64_t* vctxt) {
   uint64_t* context;
@@ -11961,6 +11851,7 @@ uint64_t highest_page(uint64_t page, uint64_t hi) {
     return hi;
 }
 
+// usando_2
 void map_page(uint64_t* context, uint64_t page, uint64_t frame) {
   uint64_t* table;
 
@@ -11985,6 +11876,68 @@ void map_page(uint64_t* context, uint64_t page, uint64_t frame) {
     printf("%s: page 0x%04lX mapped to frame 0x%08lX in context %s\n", selfie_name,
       page, (uint64_t) frame, get_name(context));
 }
+
+// ------------------------------------------------------
+// cambio_9
+uint64_t map_mmap_page_to_cache_frame(uint64_t* context,
+                                      uint64_t vaddr,
+                                      uint64_t frame) {
+  uint64_t page;
+  uint64_t current_frame;
+
+  if (frame == 0)
+    return 0;
+
+  if (is_virtual_address_valid(vaddr, PAGESIZE) == 0)
+    return 0;
+
+  page = get_page_of_virtual_address(vaddr);
+
+  if (is_virtual_address_mapped(get_pt(context), vaddr)) {
+    current_frame = get_frame_for_page(get_pt(context), page);
+
+    if (current_frame == frame)
+      return 1;
+    else
+      return 0;
+  }
+
+  map_page(context, page, frame);
+
+  return 1;
+}
+
+uint64_t map_mmap_range_to_cache_frames(uint64_t* context,
+                                        uint64_t addr,
+                                        uint64_t length,
+                                        uint64_t fd,
+                                        uint64_t file_id,
+                                        uint64_t offset) {
+  uint64_t current;
+  uint64_t vaddr;
+  uint64_t file_offset;
+  uint64_t frame;
+
+  current = 0;
+
+  while (current < length) {
+    vaddr       = addr + current;
+    file_offset = offset + current;
+
+    frame = get_or_create_cache_frame(file_id, file_offset, fd);
+
+    if (frame == 0)
+      return 0;
+
+    if (map_mmap_page_to_cache_frame(context, vaddr, frame) == 0)
+      return 0;
+
+    current = current + PAGESIZE;
+  }
+
+  return 1;
+}
+//////////////////////////////////////////////////
 
 void restore_region(uint64_t* context, uint64_t* table, uint64_t* parent_table, uint64_t lo, uint64_t hi) {
   uint64_t frame;
@@ -12225,7 +12178,7 @@ uint64_t* palloc() {
 }
 
 void pfree(uint64_t* frame) { // cambio_7
-  // TODO: implement free list of page frames
+  // falta liberar
   frame = frame + 1;
 }
 
@@ -12262,6 +12215,7 @@ uint64_t read_file_page_into_frame(uint64_t fd, uint64_t file_offset, uint64_t* 
 }
 
 uint64_t get_or_create_cache_frame(uint64_t file_id, uint64_t file_offset, uint64_t fd) {
+  // esta función busca en la cache de páginas si ya existe un frame para el archivo con file_id y file_offset. Si existe, devuelve el frame. Si no existe, asigna un nuevo frame, lee la página del archivo en ese frame, crea una nueva entrada en la cache de páginas y devuelve el frame.
   uint64_t* entry;
   uint64_t* frame;
 
@@ -12278,8 +12232,117 @@ uint64_t get_or_create_cache_frame(uint64_t file_id, uint64_t file_offset, uint6
   create_page_cache_entry(file_id, file_offset, (uint64_t) frame);
 
   return (uint64_t) frame;
+  // devuelve el frame que contiene la págna del archivo con file_id y filo_offset
 }
 //////////////////////////////////////////////////////////////////////////77
+// -----------------------------------------------------------------
+// ------------------------ MMAP VIRTUAL AREA ----------------------
+// -----------------------------------------------------------------
+// cambio_8
+
+uint64_t MMAPBASE = 2147483648; // 0x80000000 = 2GB
+uint64_t MMAPTOP  = 3221225472; // 0xC0000000 = 3GB, exclusive
+
+uint64_t is_page_aligned(uint64_t value) {
+  if (value % PAGESIZE == 0)
+    return 1;
+  else
+    return 0;
+}
+
+uint64_t ranges_overlap(uint64_t start1, uint64_t length1,
+                        uint64_t start2, uint64_t length2) {
+  uint64_t end1;
+  uint64_t end2;
+
+  end1 = start1 + length1;
+  end2 = start2 + length2;
+
+  if (start1 < end2)
+    if (start2 < end1)
+      return 1;
+
+  return 0;
+}
+
+// verificamos que la dirección virtual que estamos devolviendo no choque con otro mapping
+uint64_t is_mmap_range_free(uint64_t* context, uint64_t addr, uint64_t length) {
+  uint64_t* mapping;
+  uint64_t vaddr;
+  uint64_t end;
+
+  if (length == 0)
+    return 0;
+
+  if (is_page_aligned(addr) == 0)
+    return 0;
+
+  end = addr + length;
+
+  if (end <= addr)
+    return 0;
+
+  if (addr < MMAPBASE)
+    return 0;
+
+  if (end > MMAPTOP)
+    return 0;
+
+  mapping = get_mappings(context);
+
+  while (mapping != (uint64_t*) 0) {
+    if (ranges_overlap(addr, length,
+                       get_mapping_addr(mapping),
+                       get_mapping_length(mapping)))
+      return 0;
+
+    mapping = get_next_mapping(mapping);
+  }
+
+  vaddr = addr;
+
+  while (vaddr < end) {
+    if (is_virtual_address_mapped(get_pt(context), vaddr))
+      return 0;
+
+    vaddr = vaddr + PAGESIZE;
+  }
+
+  return 1;
+}
+
+
+/**
+ Esto implementa una estrategia simple tipo first-fit:
+
+empieza en MMAPBASE
+busca el primer hueco libre
+retorna esa dirección
+
+ */
+// cambio_8
+uint64_t choose_mmap_address(uint64_t* context, uint64_t requested_addr, uint64_t length) {
+  uint64_t addr;
+
+  if (requested_addr != 0) {
+    if (is_mmap_range_free(context, requested_addr, length))
+      return requested_addr;
+    else
+      return 0;
+  }
+
+  addr = MMAPBASE;
+
+  while (addr + length <= MMAPTOP) {
+    if (is_mmap_range_free(context, addr, length))
+      return addr;
+
+    addr = addr + PAGESIZE;
+  }
+
+  return 0;
+}
+//////////////////////////////////////
 void map_and_store(uint64_t* context, uint64_t vaddr, uint64_t data) {
   // assert: is_virtual_address_valid(vaddr, WORDSIZE) == 1
 
