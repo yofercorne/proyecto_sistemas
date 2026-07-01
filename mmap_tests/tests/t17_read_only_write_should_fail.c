@@ -8,9 +8,7 @@ uint64_t main() {
 
   p = mmap(0, 4096, 0, fd, 0);
 
-  // Este store debería fallar por permisos.
   *p = 1717;
 
-  // Si llega aquí, hay bug de permisos.
   exit(0);
 }

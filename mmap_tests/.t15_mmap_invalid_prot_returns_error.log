@@ -3,10 +3,10 @@
 ../selfie: 64-bit unsigned integers and 64-bit pointers hosted on Linux
 ../selfie: ================================================================================
 ../selfie: selfie compiling tests/t15_mmap_invalid_prot_returns_error.c to 64-bit RISC-U with 64-bit starc
-../selfie: warning in tests/t15_mmap_invalid_prot_returns_error.c in line 10: type mismatch, uint64_t expected but uint64_t* found
+../selfie: warning in tests/t15_mmap_invalid_prot_returns_error.c in line 9: type mismatch, uint64_t expected but uint64_t* found
 ../selfie: --------------------------------------------------------------------------------
-../selfie: 247 characters read in 17 lines and 1 comments
-../selfie: with 161(65.18%) characters in 65 actual symbols
+../selfie: 218 characters read in 16 lines and 0 comments
+../selfie: with 161(73.85%) characters in 65 actual symbols
 ../selfie: 0 global variables, 1 procedures, 1 string literals
 ../selfie: 2 assignments, 0 while, 2 if, 5 calls, 0 return
 ../selfie: --------------------------------------------------------------------------------

@@ -4,8 +4,8 @@
 ../selfie: ================================================================================
 ../selfie: selfie compiling tests/t18_write_only_read_should_fail.c to 64-bit RISC-U with 64-bit starc
 ../selfie: --------------------------------------------------------------------------------
-../selfie: 360 characters read in 22 lines and 3 comments
-../selfie: with 153(42.50%) characters in 74 actual symbols
+../selfie: 220 characters read in 19 lines and 0 comments
+../selfie: with 153(69.54%) characters in 74 actual symbols
 ../selfie: 0 global variables, 1 procedures, 1 string literals
 ../selfie: 3 assignments, 0 while, 2 if, 5 calls, 0 return
 ../selfie: --------------------------------------------------------------------------------

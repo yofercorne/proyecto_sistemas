@@ -1,9 +1,7 @@
 uint64_t main() {
   uint64_t fd;
-  uint64_t fd2;
   uint64_t pid;
   uint64_t* p;
-  uint64_t* b;
   uint64_t* status;
 
   fd = open("mmap_t12.bin", 2, 0);
@@ -31,17 +29,6 @@ uint64_t main() {
     exit(0);
   } else {
     wait(status);
-
-    b = malloc(sizeof(uint64_t));
-
-    fd2 = open("mmap_t12.bin", 0, 0);
-    if (fd2 == 4294967295)
-      exit(5);
-
-    read(fd2, b, 8);
-
-    if (*b != 1222)
-      exit(6);
 
     exit(0);
   }

@@ -1834,7 +1834,7 @@ uint64_t print_data_context();
 uint64_t print_data();
 
 // -----------------------------------------------------------------
-// --------------------- MMAP HELPER PROTOTYPES --------------------
+// --------------------- MMAP HELPER  --------------------
 // -----------------------------------------------------------------
 
 // mappings field
@@ -8512,12 +8512,7 @@ void implement_mmap(uint64_t* context) {
     i = i + 1;
   }
 
-  mapping = create_mapping_entry(addr,
-                                 rounded_length,
-                                 prot,
-                                 fd,
-                                 file_id,
-                                 offset);
+  mapping = create_mapping_entry(addr, rounded_length, prot, fd, file_id, offset);
 
   add_mapping(context, mapping);
 
@@ -11907,7 +11902,9 @@ uint64_t* find_mapping_by_addr(uint64_t* context, uint64_t addr) {
   return (uint64_t*) 0; // dentro de la lista de mmapings, devuelve el mapping con addres igual al solicitado
 }
 
-uint64_t* find_mapping_containing_address(uint64_t* context, uint64_t vaddr) { // este busca si la direccion virtual vaddr esta dentro de algun mapping de la lista de mapeos de memoria del contexto
+uint64_t* find_mapping_containing_address(uint64_t* context, uint64_t vaddr) { 
+  // este busca si la direccion virtual vaddr esta dentro de algun mapping de la 
+  //lista de mapeos de memoria del contexto
   uint64_t* mapping;
   uint64_t start;
   uint64_t end;
@@ -12094,8 +12091,11 @@ void set_fd_file_name(uint64_t* entry, char* name) {
   *(entry + 3) = (uint64_t) name;
 } 
 
-uint64_t* find_fd_file_entry(uint64_t fd) { // fd representa el file descriptor, el cual basicamente es un número entero que identifica de manera única un archivo abierto en un proceso.
-  // a diferencia del file id, el cual es un identificador único para un archivo en el sistema de archivos, y no cambia aunque se cierre y se vuelva a abrir el archivo
+uint64_t* find_fd_file_entry(uint64_t fd) { 
+  // fd representa el file descriptor, el cual basicamente es un número entero que identifica 
+  // de manera única un archivo abierto en un proceso.
+  // a diferencia del file id, el cual es un identificador único para un archivo en el sistema 
+  // de archivos, y no cambia aunque se cierre y se vuelva a abrir el archivo
   uint64_t* entry;
 
   entry = fd_file_table;
@@ -12110,7 +12110,8 @@ uint64_t* find_fd_file_entry(uint64_t fd) { // fd representa el file descriptor,
   return (uint64_t*) 0;
 }
 
-uint64_t find_file_id_by_name(char* name) { // sirve porque si otro proceso abre el mismo archivo, se le asigna el mismo file id, ya que el file id es único para cada archivo en el sistema de archivos, mientras que el fd es único para cada proceso y puede cambiar si se cierra y se vuelve a abrir el archivo
+uint64_t find_file_id_by_name(char* name) { 
+  // sirve porque si otro proceso abre el mismo archivo, se le asigna el mismo file id
   uint64_t* entry;
 
   entry = fd_file_table;
@@ -12138,7 +12139,8 @@ uint64_t get_or_create_file_id(char* name) {
   return file_id;
 }
 
-void record_fd_file(uint64_t fd, char* name) { // sirve para registrar que un fd (file descriptor) está asociado a un archivo con un nombre específico. 
+void record_fd_file(uint64_t fd, char* name) { 
+  // sirve para registrar que un fd (file descriptor) está asociado a un archivo con un nombre específico. 
   uint64_t* entry;
   uint64_t file_id;
 
@@ -12159,7 +12161,10 @@ void record_fd_file(uint64_t fd, char* name) { // sirve para registrar que un fd
   set_fd_file_name(entry, string_copy(name));
 }
 
-uint64_t get_file_id_from_fd(uint64_t fd) { // dado un file descriptor (fd), esta función busca en la tabla de archivos abiertos (fd_file_table) para encontrar la entrada correspondiente a ese fd y devuelve el identificador único del archivo (file id) asociado a ese fd. Si no se encuentra ninguna entrada para el fd dado, devuelve 0.
+uint64_t get_file_id_from_fd(uint64_t fd) { 
+  // dado un file descriptor (fd), esta función busca en la tabla de archivos abiertos (fd_file_table)
+  // para encontrar la entrada correspondiente a ese fd y devuelve el identificador único del archivo
+  // (file id) asociado a ese fd. Si no se encuentra ninguna entrada para el fd dado, devuelve 0.
   uint64_t* entry;
 
   entry = find_fd_file_entry(fd);
@@ -12213,10 +12218,7 @@ uint64_t mapping_allows_write(uint64_t* mapping) {
     return 0;
 }
 
-uint64_t mmap_regions_overlap(uint64_t start1,
-                              uint64_t length1,
-                              uint64_t start2,
-                              uint64_t length2) {
+uint64_t mmap_regions_overlap(uint64_t start1, uint64_t length1, uint64_t start2, uint64_t length2) {
   uint64_t end1;
   uint64_t end2;
 
@@ -12230,18 +12232,13 @@ uint64_t mmap_regions_overlap(uint64_t start1,
   return 0;
 }
 
-uint64_t region_collides_with_existing_mapping(uint64_t* context,
-                                               uint64_t addr,
-                                               uint64_t length) {
+uint64_t region_collides_with_existing_mapping(uint64_t* context, uint64_t addr, uint64_t length) {
   uint64_t* mapping;
 
   mapping = get_mappings(context);
 
   while (mapping != (uint64_t*) 0) {
-    if (mmap_regions_overlap(addr,
-                             length,
-                             get_mapping_addr(mapping),
-                             get_mapping_length(mapping)))
+    if (mmap_regions_overlap(addr, length, get_mapping_addr(mapping), get_mapping_length(mapping)))
       return 1;
 
     mapping = get_next_mapping(mapping);
@@ -12250,9 +12247,7 @@ uint64_t region_collides_with_existing_mapping(uint64_t* context,
   return 0;
 }
 
-uint64_t is_region_free_for_mmap(uint64_t* context,
-                                 uint64_t addr,
-                                 uint64_t length) {
+uint64_t is_region_free_for_mmap(uint64_t* context, uint64_t addr, uint64_t length) {
   uint64_t end;
 
   end = addr + length;

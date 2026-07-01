@@ -4,8 +4,8 @@
 ../selfie: ================================================================================
 ../selfie: selfie compiling tests/t05_same_file_two_mappings_share.c to 64-bit RISC-U with 64-bit starc
 ../selfie: --------------------------------------------------------------------------------
-../selfie: 504 characters read in 32 lines and 1 comments
-../selfie: with 300(59.52%) characters in 140 actual symbols
+../selfie: 423 characters read in 31 lines and 0 comments
+../selfie: with 300(70.92%) characters in 140 actual symbols
 ../selfie: 0 global variables, 1 procedures, 2 string literals
 ../selfie: 5 assignments, 0 while, 5 if, 10 calls, 0 return
 ../selfie: --------------------------------------------------------------------------------

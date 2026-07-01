@@ -4,8 +4,8 @@
 ../selfie: ================================================================================
 ../selfie: selfie compiling tests/t09_munmap_twice_fails_second_time.c to 64-bit RISC-U with 64-bit starc
 ../selfie: --------------------------------------------------------------------------------
-../selfie: 332 characters read in 24 lines and 1 comments
-../selfie: with 197(59.34%) characters in 94 actual symbols
+../selfie: 281 characters read in 23 lines and 0 comments
+../selfie: with 197(70.11%) characters in 94 actual symbols
 ../selfie: 0 global variables, 1 procedures, 1 string literals
 ../selfie: 4 assignments, 0 while, 3 if, 8 calls, 0 return
 ../selfie: --------------------------------------------------------------------------------

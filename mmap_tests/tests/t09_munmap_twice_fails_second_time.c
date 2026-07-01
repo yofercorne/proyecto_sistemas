@@ -15,7 +15,6 @@ uint64_t main() {
 
   r = munmap(p);
 
-  // Selfie syscalls devuelven -1 como 4294967295.
   if (r != 4294967295)
     exit(3);
 

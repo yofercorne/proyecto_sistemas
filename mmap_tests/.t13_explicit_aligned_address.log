@@ -4,8 +4,8 @@
 ../selfie: ================================================================================
 ../selfie: selfie compiling tests/t13_explicit_aligned_address.c to 64-bit RISC-U with 64-bit starc
 ../selfie: --------------------------------------------------------------------------------
-../selfie: 265 characters read in 17 lines and 1 comments
-../selfie: with 151(56.98%) characters in 67 actual symbols
+../selfie: 208 characters read in 16 lines and 0 comments
+../selfie: with 151(72.60%) characters in 67 actual symbols
 ../selfie: 0 global variables, 1 procedures, 1 string literals
 ../selfie: 2 assignments, 0 while, 2 if, 5 calls, 0 return
 ../selfie: --------------------------------------------------------------------------------

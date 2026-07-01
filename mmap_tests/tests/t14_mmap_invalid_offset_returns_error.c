@@ -6,7 +6,6 @@ uint64_t main() {
   if (fd == 4294967295)
     exit(1);
 
-  // Offset no múltiplo de 4096. Debe fallar.
   result = mmap(0, 4096, 2, fd, 8);
 
   if (result != 4294967295)

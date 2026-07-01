@@ -4,8 +4,8 @@
 ../selfie: ================================================================================
 ../selfie: selfie compiling tests/t19_access_after_munmap_should_fail.c to 64-bit RISC-U with 64-bit starc
 ../selfie: --------------------------------------------------------------------------------
-../selfie: 352 characters read in 24 lines and 2 comments
-../selfie: with 177(50.28%) characters in 88 actual symbols
+../selfie: 256 characters read in 22 lines and 0 comments
+../selfie: with 177(69.14%) characters in 88 actual symbols
 ../selfie: 0 global variables, 1 procedures, 1 string literals
 ../selfie: 3 assignments, 0 while, 3 if, 7 calls, 0 return
 ../selfie: --------------------------------------------------------------------------------

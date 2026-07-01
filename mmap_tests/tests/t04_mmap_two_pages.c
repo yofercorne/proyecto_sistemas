@@ -11,7 +11,6 @@ uint64_t main() {
   if (*p != 401)
     exit(2);
 
-  // Primera palabra de la segunda página.
   if (*(p + 512) != 402)
     exit(3);
 

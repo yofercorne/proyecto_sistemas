@@ -4,8 +4,8 @@
 ../selfie: ================================================================================
 ../selfie: selfie compiling tests/t08_munmap_without_msync_does_not_persist.c to 64-bit RISC-U with 64-bit starc
 ../selfie: --------------------------------------------------------------------------------
-../selfie: 269 characters read in 22 lines and 0 comments
-../selfie: with 186(69.14%) characters in 93 actual symbols
+../selfie: 270 characters read in 23 lines and 0 comments
+../selfie: with 186(68.88%) characters in 93 actual symbols
 ../selfie: 0 global variables, 1 procedures, 1 string literals
 ../selfie: 4 assignments, 0 while, 3 if, 7 calls, 0 return
 ../selfie: --------------------------------------------------------------------------------

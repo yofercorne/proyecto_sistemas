@@ -23,7 +23,6 @@ uint64_t main() {
 
   *p1 = 555;
 
-  // Debe verse sin msync, porque ambos mappings comparten el mismo cache frame.
   if (*p2 != 555)
     exit(5);
 

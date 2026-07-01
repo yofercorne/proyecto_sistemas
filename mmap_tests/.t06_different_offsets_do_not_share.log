@@ -4,8 +4,8 @@
 ../selfie: ================================================================================
 ../selfie: selfie compiling tests/t06_different_offsets_do_not_share.c to 64-bit RISC-U with 64-bit starc
 ../selfie: --------------------------------------------------------------------------------
-../selfie: 384 characters read in 27 lines and 1 comments
-../selfie: with 230(59.89%) characters in 115 actual symbols
+../selfie: 330 characters read in 26 lines and 0 comments
+../selfie: with 230(69.70%) characters in 115 actual symbols
 ../selfie: 0 global variables, 1 procedures, 1 string literals
 ../selfie: 4 assignments, 0 while, 4 if, 8 calls, 0 return
 ../selfie: --------------------------------------------------------------------------------

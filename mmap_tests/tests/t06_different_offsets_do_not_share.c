@@ -18,7 +18,6 @@ uint64_t main() {
 
   *p0 = 666;
 
-  // Offset distinto debe apuntar a otro cache frame.
   if (*p1 == 666)
     exit(4);
 

@@ -3,10 +3,10 @@
 ../selfie: 64-bit unsigned integers and 64-bit pointers hosted on Linux
 ../selfie: ================================================================================
 ../selfie: selfie compiling tests/t20_mmap_invalid_fd_returns_error.c to 64-bit RISC-U with 64-bit starc
-../selfie: warning in tests/t20_mmap_invalid_fd_returns_error.c in line 5: type mismatch, uint64_t expected but uint64_t* found
+../selfie: warning in tests/t20_mmap_invalid_fd_returns_error.c in line 4: type mismatch, uint64_t expected but uint64_t* found
 ../selfie: --------------------------------------------------------------------------------
-../selfie: 198 characters read in 12 lines and 1 comments
-../selfie: with 99(50.00%) characters in 40 actual symbols
+../selfie: 133 characters read in 11 lines and 0 comments
+../selfie: with 99(74.43%) characters in 40 actual symbols
 ../selfie: 0 global variables, 1 procedures, 0 string literals
 ../selfie: 1 assignments, 0 while, 1 if, 3 calls, 0 return
 ../selfie: --------------------------------------------------------------------------------
@@ -48,7 +48,7 @@
 ../selfie: system:  ecall: 4(5.97%)
 ../selfie: --------------------------------------------------------------------------------
 ../selfie: profile: total,max(ratio%)@address(line#),2ndmax,3rdmax
-../selfie: calls:   3,1(33.33%)@0x54(~1),1(33.33%)@0xF4(~1),1(33.33%)@0x1B8(~5)
+../selfie: calls:   3,1(33.33%)@0x54(~1),1(33.33%)@0xF4(~1),1(33.33%)@0x1B8(~4)
 ../selfie: loops:   0,0(0.00%),0(0.00%),0(0.00%)
 ../selfie: loads:   9,1(11.11%)@0x34(~1),1(11.11%)@0x54(~1),1(11.11%)@0xF4(~1)
 ../selfie: stores:  12,1(8.33%)@0x30(~1),1(8.33%)@0x3C(~1),1(8.33%)@0x44(~1)

@@ -12,12 +12,10 @@ uint64_t main() {
   if (munmap(p) != 0)
     exit(2);
 
-  // Esta lectura debería fallar porque el mapping ya no existe.
   x = *p;
 
   if (x == 0)
     exit(0);
 
-  // Si llega aquí, hay bug.
   exit(0);
 }

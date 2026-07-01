@@ -9,13 +9,10 @@ uint64_t main() {
 
   p = mmap(0, 4096, 1, fd, 0);
 
-  // Este load debería fallar por permisos.
   x = *p;
 
-  // Evitar warning conceptual de variable no usada.
   if (x == 0)
     exit(0);
 
-  // Si llega aquí, hay bug de permisos.
   exit(0);
 }

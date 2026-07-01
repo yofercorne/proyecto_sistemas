@@ -6,7 +6,6 @@ uint64_t main() {
   if (fd == 4294967295)
     exit(1);
 
-  // Solo aceptamos 0, 1, 2.
   result = mmap(0, 4096, 9, fd, 0);
 
   if (result != 4294967295)

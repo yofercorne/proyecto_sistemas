@@ -12,7 +12,6 @@ uint64_t main() {
   if (*p != 1601)
     exit(2);
 
-  // Segunda reserva en la misma dirección debe fallar.
   result = mmap(2147483648, 4096, 2, fd, 0);
 
   if (result != 4294967295)
