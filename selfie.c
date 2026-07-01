@@ -107,6 +107,11 @@ uint64_t wait(uint64_t* wstatus);
 // selfie bootstraps void* to uint64_t* and unsigned to uint64_t!
 void* malloc(unsigned long);
 
+// new_mmap
+uint64_t* mmap(uint64_t addr, uint64_t length, uint64_t prot, uint64_t fd, uint64_t offset);
+uint64_t munmap(uint64_t addr);
+uint64_t msync(uint64_t addr);
+
 // selfie bootstraps the following *printf procedures
 int printf(const char* format, ...);
 int sprintf(char* str, const char* format, ...);
@@ -1290,6 +1295,15 @@ void 	implement_fork(uint64_t* context);
 void	emit_wait();
 void	implement_wait(uint64_t* context);
 
+void emit_mmap();
+void implement_mmap(uint64_t* context);
+
+void emit_munmap();
+void implement_munmap(uint64_t* context);
+
+void emit_msync();
+void implement_msync(uint64_t* context);
+
 uint64_t is_boot_level_zero();
 
 // ------------------------ GLOBAL CONSTANTS -----------------------
@@ -1308,6 +1322,11 @@ uint64_t SYSCALL_BRK    = 214;
 uint64_t SYSCALL_FORK	= 215;
 uint64_t SYSCALL_WAIT	= 216;
 
+uint64_t SYSCALL_MMAP = 217;
+uint64_t SYSCALL_MUNMAP = 218;
+uint64_t SYSCALL_MSYNC  = 219;
+
+
 uint64_t LSEEK_SET = 0;
 uint64_t LSEEK_CUR = 1;
 // cambio_4
@@ -1322,6 +1341,17 @@ uint64_t DIRFD_AT_FDCWD = -100;
 
 uint64_t* IO_buffer      = (uint64_t*) 0;
 uint64_t  IO_buffer_size = 0;
+
+uint64_t PROT_READ       = 0;
+uint64_t PROT_WRITE      = 1;
+uint64_t PROT_READ_WRITE = 2;
+
+// 2GB: zona virtual inicial para mappings.
+// Está lejos del heap normal y debajo del stack.
+
+uint64_t MMAPBASE = 2147483648; // 0x80000000 = 2GB
+uint64_t MMAPTOP  = 3221225472; // 0xC0000000 = 3GB, exclusive
+
 
 // -----------------------------------------------------------------
 // ------------------------ HYPSTER SYSCALL ------------------------
@@ -1803,6 +1833,110 @@ uint64_t print_data_line_number();
 uint64_t print_data_context();
 uint64_t print_data();
 
+// -----------------------------------------------------------------
+// --------------------- MMAP HELPER PROTOTYPES --------------------
+// -----------------------------------------------------------------
+
+// mappings field
+uint64_t* get_mappings(uint64_t* context);
+void set_mappings(uint64_t* context, uint64_t* mappings);
+
+// mapping entry
+uint64_t* allocate_mapping_entry();
+uint64_t* get_next_mapping(uint64_t* mapping);
+uint64_t get_mapping_addr(uint64_t* mapping);
+uint64_t get_mapping_length(uint64_t* mapping);
+uint64_t get_mapping_prot(uint64_t* mapping);
+uint64_t get_mapping_fd(uint64_t* mapping);
+uint64_t get_mapping_file_id(uint64_t* mapping);
+uint64_t get_mapping_offset(uint64_t* mapping);
+
+void set_next_mapping(uint64_t* mapping, uint64_t* next);
+void set_mapping_addr(uint64_t* mapping, uint64_t addr);
+void set_mapping_length(uint64_t* mapping, uint64_t length);
+void set_mapping_prot(uint64_t* mapping, uint64_t prot);
+void set_mapping_fd(uint64_t* mapping, uint64_t fd);
+void set_mapping_file_id(uint64_t* mapping, uint64_t file_id);
+void set_mapping_offset(uint64_t* mapping, uint64_t offset);
+
+uint64_t* create_mapping_entry(uint64_t addr,
+                               uint64_t length,
+                               uint64_t prot,
+                               uint64_t fd,
+                               uint64_t file_id,
+                               uint64_t offset);
+
+void add_mapping(uint64_t* context, uint64_t* mapping);
+uint64_t* find_mapping_by_addr(uint64_t* context, uint64_t addr);
+uint64_t* find_mapping_containing_address(uint64_t* context, uint64_t vaddr);
+uint64_t is_mapped_address(uint64_t* context, uint64_t vaddr);
+uint64_t* remove_mapping_by_addr(uint64_t* context, uint64_t addr);
+
+// page cache
+uint64_t* allocate_page_cache_entry();
+uint64_t* get_next_page_cache_entry(uint64_t* entry);
+uint64_t get_page_cache_file_id(uint64_t* entry);
+uint64_t get_page_cache_file_offset(uint64_t* entry);
+uint64_t get_page_cache_frame(uint64_t* entry);
+
+void set_next_page_cache_entry(uint64_t* entry, uint64_t* next);
+void set_page_cache_file_id(uint64_t* entry, uint64_t file_id);
+void set_page_cache_file_offset(uint64_t* entry, uint64_t file_offset);
+void set_page_cache_frame(uint64_t* entry, uint64_t frame);
+
+uint64_t* find_page_cache_entry(uint64_t file_id, uint64_t file_offset);
+uint64_t* create_page_cache_entry(uint64_t file_id,
+                                  uint64_t file_offset,
+                                  uint64_t frame);
+
+// file ids
+void record_fd_file(uint64_t fd, char* name);
+uint64_t get_file_id_from_fd(uint64_t fd);
+
+// mmap helpers
+uint64_t is_valid_mmap_prot(uint64_t prot);
+uint64_t mapping_allows_read(uint64_t* mapping);
+uint64_t mapping_allows_write(uint64_t* mapping);
+
+uint64_t mmap_regions_overlap(uint64_t start1,
+                              uint64_t length1,
+                              uint64_t start2,
+                              uint64_t length2);
+
+uint64_t region_collides_with_existing_mapping(uint64_t* context,
+                                               uint64_t addr,
+                                               uint64_t length);
+
+uint64_t is_region_free_for_mmap(uint64_t* context,
+                                 uint64_t addr,
+                                 uint64_t length);
+
+uint64_t find_free_mmap_region(uint64_t* context, uint64_t length);
+
+void mmap_return_error(uint64_t* context);
+void munmap_return_error(uint64_t* context);
+void msync_return_error(uint64_t* context);
+
+void map_mmap_page(uint64_t* context, uint64_t page, uint64_t frame);
+void unmap_mmap_page(uint64_t* context, uint64_t page);
+
+// fork + mmap
+void copy_mappings(uint64_t* parent, uint64_t* child);
+void map_shared_mappings_after_fork(uint64_t* parent, uint64_t* child);
+
+// frame/file sync
+uint64_t read_file_page_into_frame(uint64_t fd,
+                                   uint64_t file_offset,
+                                   uint64_t* frame);
+
+uint64_t get_or_create_cache_frame(uint64_t file_id,
+                                   uint64_t file_offset,
+                                   uint64_t fd);
+
+uint64_t write_frame_to_file_page(uint64_t fd,
+                                  uint64_t file_offset,
+                                  uint64_t* frame);
+
 // ------------------------ GLOBAL CONSTANTS -----------------------
 
 // RISC-U instructions
@@ -2237,7 +2371,7 @@ void unblock_context(uint64_t* context);
 // extended in the symbolic execution engine and the Boehm garbage collector
 
 // agregar más entries por el mmaping; 
-uint64_t CONTEXTENTRIES = 38; // cambio_1
+uint64_t CONTEXTENTRIES = 40; // cambio_1
 uint64_t N_CONTEXTS = 0;
 uint64_t* RUNNING = (uint64_t*) 0;
 uint64_t N_BLOCKED_CONTEXTS = 0;
@@ -2326,6 +2460,8 @@ uint64_t  get_ec_page_fault(uint64_t* context)  { return *(context + 24); }
 uint64_t  get_ec_timer(uint64_t* context)       { return *(context + 25); }
 uint64_t  get_mc_stack_peak(uint64_t* context)  { return *(context + 26); }
 uint64_t  get_mc_mapped_heap(uint64_t* context) { return *(context + 27); }
+uint64_t get_child_exit_ready(uint64_t* context) {return *(context + 39); }
+
 
 uint64_t* get_used_list_head(uint64_t* context) { return (uint64_t*) *(context + 28); }
 uint64_t* get_free_list_head(uint64_t* context) { return (uint64_t*) *(context + 29); }
@@ -2337,7 +2473,9 @@ uint64_t get_status(uint64_t* context) { return *(context + 34); }
 uint64_t get_nchildren(uint64_t* context) { return *(context + 35); }
 uint64_t get_child_exit_code(uint64_t* context) { return *(context + 36); }
 uint64_t get_child_pid (uint64_t* context) { return *(context + 37); }
-uint64_t get_mappings(uint64_t* context) { return *(context + 38); } // cambio_2
+uint64_t* get_mappings(uint64_t* context) {return (uint64_t*) *(context + 38);}  // cambio_2
+void set_child_exit_ready(uint64_t* context, uint64_t value) {  *(context + 39) = value;}
+
 
 void set_next_context(uint64_t* context, uint64_t* next)     { *context        = (uint64_t) next; }
 void set_prev_context(uint64_t* context, uint64_t* prev)     { *(context + 1)  = (uint64_t) prev; }
@@ -6355,6 +6493,9 @@ void selfie_compile() {
   emit_fork();
   emit_wait();
   emit_open();
+  emit_mmap();
+  emit_munmap();
+  emit_msync();
 
   emit_malloc();
 
@@ -7591,35 +7732,44 @@ void emit_exit() {
 }
 
 void implement_exit(uint64_t* context) {
-  // parameter
   uint64_t signed_int_exit_code;
   uint64_t wstatus_addr;
   uint64_t* parent;
 
-  if (debug_syscalls) {
-    printf("(exit): ");
-    print_register_hexadecimal(REG_A0);
-    printf(" |- ->\n");
+  signed_int_exit_code = sign_extend(*(get_regs(context) + REG_A0), SYSCALL_BITWIDTH);
+
+  set_exit_code(context, signed_int_exit_code);
+
+  parent = get_parent_process(context);
+
+  if (parent != (uint64_t*) 0) {
+    set_child_exit_code(parent, get_exit_code(context));
+    set_child_pid(parent, get_pid(context));
+    set_child_exit_ready(parent, 1);
+
+    if (get_status(parent) == STATUS_BLOCKED) {
+      wstatus_addr = *(get_regs(parent) + REG_A1);
+
+      if (wstatus_addr != 0)
+        map_and_store(parent, wstatus_addr, get_exit_code(context));
+
+      *(get_regs(parent) + REG_A0) = get_pid(context);
+
+      set_child_exit_ready(parent, 0);
+      set_child_exit_code(parent, 0);
+      set_child_pid(parent, 0);
+
+      if (get_nchildren(parent) > 0)
+        set_nchildren(parent, get_nchildren(parent) - 1);
+
+      set_pc(parent, get_pc(parent) + INSTRUCTIONSIZE);
+
+      unblock_context(parent);
+    }
   }
 
-  signed_int_exit_code = *(get_regs(context) + REG_A0);
-  set_exit_code(context, sign_shrink(signed_int_exit_code, SYSCALL_BITWIDTH));
-
-  parent = get_parent_process (context);
-
-	if (parent != (uint64_t*) 0) {
-		set_child_exit_code(parent, get_exit_code(context));
-		set_child_pid(parent, get_pid(context));
-		
-		if (get_status(parent) == STATUS_BLOCKED) {
-			wstatus_addr = *(get_regs(parent) + REG_A1);
-			if (wstatus_addr != (uint64_t) 0) {
-				store_virtual_memory(get_pt(parent), wstatus_addr, get_exit_code(context));
-				unblock_context(parent);
-			}
-		}
-	}
-
+  // CLAVE:
+  // El contexto que llamó exit ya no debe seguir en used_contexts.
   used_contexts = delete_context(context, used_contexts);
 }
 
@@ -8072,6 +8222,9 @@ void emit_fork() {
 
 	emit_jalr(REG_ZR, REG_RA, 0);
 }
+uint64_t next_page_start(uint64_t vaddr) {
+  return get_virtual_address_of_page_start(get_page_of_virtual_address(vaddr) + 1);
+}
 
 void implement_fork(uint64_t* context) {
 	uint64_t* child;
@@ -8099,19 +8252,35 @@ void implement_fork(uint64_t* context) {
 
 	/* Copy low pages */
 	page = get_lowest_lo_page(context);
-	vaddr = page * PAGESIZE;
-	while (get_page_of_virtual_address(vaddr) < get_highest_lo_page(context)) {
-		map_and_store (child, vaddr, load_virtual_memory(get_pt(context), vaddr));
-		vaddr = vaddr + WORDSIZE;
-	}
+vaddr = page * PAGESIZE;
+
+while (get_page_of_virtual_address(vaddr) < get_highest_lo_page(context)) {
+  if (is_page_mapped(get_pt(context), get_page_of_virtual_address(vaddr)) == 0)
+    vaddr = next_page_start(vaddr);
+  else if (is_mapped_address(context, vaddr))
+    vaddr = next_page_start(vaddr);
+  else {
+    map_and_store(child, vaddr, load_virtual_memory(get_pt(context), vaddr));
+
+    vaddr = vaddr + WORDSIZE;
+  }
+}
 
 	/* Copy high pages */
 	page = get_lowest_hi_page(context);
-	vaddr = page * PAGESIZE;
-	while (get_page_of_virtual_address(vaddr) < get_highest_hi_page(context)) {
-		map_and_store (child, vaddr, load_virtual_memory(get_pt(context), vaddr));
-		vaddr = vaddr + WORDSIZE;
-	}
+vaddr = page * PAGESIZE;
+
+while (get_page_of_virtual_address(vaddr) < get_highest_hi_page(context)) {
+  if (is_page_mapped(get_pt(context), get_page_of_virtual_address(vaddr)) == 0)
+    vaddr = next_page_start(vaddr);
+  else if (is_mapped_address(context, vaddr))
+    vaddr = next_page_start(vaddr);
+  else {
+    map_and_store(child, vaddr, load_virtual_memory(get_pt(context), vaddr));
+
+    vaddr = vaddr + WORDSIZE;
+  }
+}
 	
 	/* Copy page bounds */
 	set_lowest_lo_page(child, get_lowest_lo_page(context));
@@ -8136,6 +8305,9 @@ void implement_fork(uint64_t* context) {
 	set_mc_stack_peak(child, get_mc_stack_peak(context));
 	set_mc_mapped_heap(child, get_mc_mapped_heap(context));
 
+  copy_mappings(context, child);
+  map_shared_mappings_after_fork(context, child); 
+
 	set_nchildren(context, get_nchildren(context) + 1);
 
 	*(get_regs(context) + REG_A0) = get_pid(child);
@@ -8159,129 +8331,325 @@ void emit_wait() {
 }
 
 void implement_wait(uint64_t* context) {
-	uint64_t wstatus;
+  uint64_t wstatus;
 
-	wstatus = *(get_regs(context) + REG_A1);
+  wstatus = *(get_regs(context) + REG_A1);
 
-	if (is_virtual_address_valid(wstatus, WORDSIZE)) {
-		if (is_valid_segment_write(wstatus)) {
-			if (get_child_exit_code (context) != (uint64_t) 0) {
-				map_and_store(context, wstatus, get_child_exit_code(context) * 256);
-			} else {
-				block_context(context);
-			}
+  if (get_nchildren(context) == 0) {
+    *(get_regs(context) + REG_A0) = sign_shrink(-1, SYSCALL_BITWIDTH);
+    set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
 
-			*(get_regs(context) + REG_A0) = get_child_pid(context);
-			set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
-		} else {
-			if (wstatus == 0) {
-				*(get_regs(context) + REG_A0) = get_child_pid(context);
-			} else {
-				*(get_regs(context) + REG_A0) = -1;
-			}
-			set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
-		}
-	} else {
-		*(get_regs(context) + REG_A0) = -1;
-			set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
-	}
+    return;
+  }
+
+  if (wstatus != 0) {
+    if (is_virtual_address_valid(wstatus, WORDSIZE) == 0) {
+      *(get_regs(context) + REG_A0) = sign_shrink(-1, SYSCALL_BITWIDTH);
+      set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+
+      return;
+    }
+
+    if (is_valid_segment_write(wstatus) == 0) {
+      *(get_regs(context) + REG_A0) = sign_shrink(-1, SYSCALL_BITWIDTH);
+      set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+
+      return;
+    }
+  }
+
+  if (get_child_exit_ready(context)) {
+    if (wstatus != 0)
+      map_and_store(context, wstatus, get_child_exit_code(context));
+
+    *(get_regs(context) + REG_A0) = get_child_pid(context);
+
+    set_child_exit_ready(context, 0);
+    set_child_exit_code(context, 0);
+    set_child_pid(context, 0);
+
+    if (get_nchildren(context) > 0)
+      set_nchildren(context, get_nchildren(context) - 1);
+
+    set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+
+    return;
+  }
+
+  block_context(context);
+
+  // No avanzar PC aquí.
 }
 
-// segunda parte de implementacion //////////////////////////////////////////////
-// parámtros: ptr = mmap(0, 8192, 2, fd, 0); // addr, length, prot, fd, offset
+
+void emit_mmap() {
+  create_symbol_table_entry(GLOBAL_TABLE, string_copy("mmap"),
+    0, PROCEDURE, UINT64STAR_T, 5, code_size);
+
+  emit_load(REG_A0, REG_SP, 0); // addr
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_load(REG_A1, REG_SP, 0); // length
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_load(REG_A2, REG_SP, 0); // prot
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_load(REG_A3, REG_SP, 0); // fd
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_load(REG_A4, REG_SP, 0); // offset
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_MMAP);
+
+  emit_ecall();
+
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
 void implement_mmap(uint64_t* context) {
-  uint64_t* regs = get_regs(context); // sacamos todos los registros del contexto actual
-
-  uint64_t requested_addr = *(regs + REG_A0); // en A_0 se encuenta la dirección solicitada, pasada como primer argumento a la syscall
-  uint64_t length         = *(regs + REG_A1); // en A_1 se encuentra la longitud de la memoria
-  uint64_t prot           = *(regs + REG_A2); // prot resenta los permisos de la memoria solicitada 
-  uint64_t fd             = *(regs + REG_A3); // en A_3 se encuentra el file descriptor del archivo que se quiere mapear
-  uint64_t offset         = *(regs + REG_A4);  
-
-  if (length == 0) {
-    *(regs + REG_A0) = -1;
-    return;
-  }
-
-  if (offset % PAGESIZE != 0) {  // tiene que ser multiplo del tamaño de la página porque el offset es la posición del archivo desde donde se quiere mapear la memoria, y el mapeo de memoria se hace por páginas
-    *(regs + REG_A0) = -1;
-    return;
-  }
-
-  if (requested_addr != 0 && requested_addr % PAGESIZE != 0) {
-    *(regs + REG_A0) = -1;
-    return;
-  }
-
-  if (!is_valid_fd(context, fd)) {
-    *(regs + REG_A0) = -1;
-    return;
-  }
-
-  /**
-   length = 8192 // 5000
-PAGESIZE = 4096
-
-   */
-  // dadq que el mapeo de memoria se hace por páginas, la longitud solicitada tiene que ser redondeada al tamaño de página más cercano
-  uint64_t rounded_length =
-    ((length + PAGESIZE - 1) / PAGESIZE) * PAGESIZE;
-
-  uint64_t pages = rounded_length / PAGESIZE;
-
-  uint64_t file_id = get_file_id_from_fd(context, fd);
+  uint64_t requested_addr;
+  uint64_t length;
+  uint64_t rounded_length;
+  uint64_t prot;
+  uint64_t fd;
+  uint64_t offset;
 
   uint64_t addr;
+  uint64_t pages;
+  uint64_t i;
 
-  if (requested_addr == 0) // en el caso de que no se haya solicitado una dirección específica, se busca una región libre de memoria para mapear el archivo
+  uint64_t file_id;
+  uint64_t file_page_offset;
+  uint64_t virtual_page;
+  uint64_t frame;
+
+  uint64_t* mapping;
+
+  requested_addr = *(get_regs(context) + REG_A0);
+  length         = *(get_regs(context) + REG_A1);
+  prot           = *(get_regs(context) + REG_A2);
+  fd             = *(get_regs(context) + REG_A3);
+  offset         = *(get_regs(context) + REG_A4);
+
+  if (length == 0) {
+    mmap_return_error(context);
+
+    return;
+  }
+
+  if (length > HIGHESTVIRTUALADDRESS) {
+    mmap_return_error(context);
+
+    return;
+  }
+
+  if (is_valid_mmap_prot(prot) == 0) {
+    mmap_return_error(context);
+
+    return;
+  }
+
+  if (offset % PAGESIZE != 0) {
+    mmap_return_error(context);
+
+    return;
+  }
+
+  if (requested_addr != 0)
+    if (requested_addr % PAGESIZE != 0) {
+      mmap_return_error(context);
+
+      return;
+    }
+
+  file_id = get_file_id_from_fd(fd);
+
+  if (file_id == 0) {
+    mmap_return_error(context);
+
+    return;
+  }
+
+  rounded_length = round_up(length, PAGESIZE);
+
+  pages = rounded_length / PAGESIZE;
+
+  if (requested_addr == 0)
     addr = find_free_mmap_region(context, rounded_length);
   else
     addr = requested_addr;
 
-  // si la dirección solicitada no es válida o la región de memoria solicitada colisiona con otra región de memoria ya mapeada, se retorna -1
-  if (region_collides_with_existing_memory(context, addr, rounded_length)) {
-    *(regs + REG_A0) = -1;
+  if (addr == 0) {
+    mmap_return_error(context);
+
     return;
   }
 
-  /**
-   ¿Esta dirección virtual pertenece a un mmap?
-¿Qué archivo representa?
-¿Cuál era su offset inicial?
-¿Cuánto mide?
-¿Qué permisos tiene?
-   */
-  mapping_entry* mapping = allocate_mapping_entry();
+  if (is_region_free_for_mmap(context, addr, rounded_length) == 0) {
+    mmap_return_error(context);
 
-  mapping->addr    = addr;
-  mapping->length  = rounded_length;
-  mapping->prot    = prot;
-  mapping->fd      = fd;
-  mapping->file_id = file_id;
-  mapping->offset  = offset;
-  mapping->next    = (mapping_entry*) get_mappings(context); // se agrega el nuevo mapeo al inicio de la lista de mapeos del contexto actual
-
-
-
-  set_mappings(context, (uint64_t) mapping);
-
-  // mapear cada una de las páginas
-
-  for (uint64_t i = 0; i < pages; i++) {
-    uint64_t virtual_page = addr + i * PAGESIZE;
-    uint64_t file_offset  = offset + i * PAGESIZE;
-
-    uint64_t frame =
-      get_or_create_cache_frame(file_id, file_offset, fd);
-      // si el frame ya existe en la cache, se retorna el frame existente, si no, se crea un nuevo frame y se retorna su dirección
-
-    map_page(context, virtual_page, frame);
+    return;
   }
 
-  *(regs + REG_A0) = addr;
+  i = 0;
+
+  while (i < pages) {
+    virtual_page     = get_page_of_virtual_address(addr + i * PAGESIZE);
+    file_page_offset = offset + i * PAGESIZE;
+
+    frame = get_or_create_cache_frame(file_id, file_page_offset, fd);
+
+    if (frame == 0) {
+      mmap_return_error(context);
+
+      return;
+    }
+
+    map_mmap_page(context, virtual_page, frame);
+
+    i = i + 1;
+  }
+
+  mapping = create_mapping_entry(addr,
+                                 rounded_length,
+                                 prot,
+                                 fd,
+                                 file_id,
+                                 offset);
+
+  add_mapping(context, mapping);
+
+  *(get_regs(context) + REG_A0) = addr;
+
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
 }
 
 
+void implement_msync(uint64_t* context) {
+  uint64_t addr;
+  uint64_t pages;
+  uint64_t i;
+
+  uint64_t vaddr;
+  uint64_t page;
+  uint64_t frame;
+  uint64_t file_offset;
+  uint64_t fd;
+
+  uint64_t* mapping;
+
+  addr = *(get_regs(context) + REG_A0);
+
+  mapping = find_mapping_by_addr(context, addr);
+
+  if (mapping == (uint64_t*) 0) {
+    msync_return_error(context);
+
+    return;
+  }
+
+  fd = get_mapping_fd(mapping);
+
+  pages = get_mapping_length(mapping) / PAGESIZE;
+
+  i = 0;
+
+  while (i < pages) {
+    vaddr       = get_mapping_addr(mapping) + i * PAGESIZE;
+    page        = get_page_of_virtual_address(vaddr);
+    file_offset = get_mapping_offset(mapping) + i * PAGESIZE;
+
+    frame = get_frame_for_page(get_pt(context), page);
+
+    if (frame == 0) {
+      msync_return_error(context);
+
+      return;
+    }
+
+    if (write_frame_to_file_page(fd, file_offset, (uint64_t*) frame) == 0) {
+      msync_return_error(context);
+
+      return;
+    }
+
+    i = i + 1;
+  }
+
+  *(get_regs(context) + REG_A0) = 0;
+
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+}
+
+void emit_msync() {
+  create_symbol_table_entry(GLOBAL_TABLE, string_copy("msync"),
+    0, PROCEDURE, UINT64_T, 1, code_size);
+
+  emit_load(REG_A0, REG_SP, 0); // addr
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_MSYNC);
+
+  emit_ecall();
+
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+// -------------------------------
+void emit_munmap() {
+  create_symbol_table_entry(GLOBAL_TABLE, string_copy("munmap"),
+    0, PROCEDURE, UINT64_T, 1, code_size);
+
+  emit_load(REG_A0, REG_SP, 0); // addr
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_MUNMAP);
+
+  emit_ecall();
+
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_munmap(uint64_t* context) {
+  uint64_t addr;
+  uint64_t pages;
+  uint64_t i;
+  uint64_t vaddr;
+  uint64_t page;
+
+  uint64_t* mapping;
+
+  addr = *(get_regs(context) + REG_A0);
+
+  mapping = find_mapping_by_addr(context, addr);
+
+  if (mapping == (uint64_t*) 0) {
+    munmap_return_error(context);
+
+    return;
+  }
+
+  pages = get_mapping_length(mapping) / PAGESIZE;
+
+  i = 0;
+
+  while (i < pages) {
+    vaddr = get_mapping_addr(mapping) + i * PAGESIZE;
+    page  = get_page_of_virtual_address(vaddr);
+
+    unmap_mmap_page(context, page);
+
+    i = i + 1;
+  }
+
+  remove_mapping_by_addr(context, addr);
+
+  *(get_regs(context) + REG_A0) = 0;
+
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+}
 
 uint64_t is_boot_level_zero() {
   // C99 malloc(0) returns either a null pointer or a unique pointer,
@@ -10271,7 +10639,11 @@ void do_ecall() {
 					read_register(REG_A2);
 
 					if (*(registers + REG_A7) == SYSCALL_OPENAT)
-					read_register(REG_A3);
+            read_register(REG_A3);
+          else if (*(registers + REG_A7) == SYSCALL_MMAP) {
+            read_register(REG_A3);
+            read_register(REG_A4);
+          }
 				}
 			}
 
@@ -11280,9 +11652,9 @@ void init_context(uint64_t* context, uint64_t* parent, uint64_t* vctxt) {
 
   set_status(context, STATUS_READY);
   set_nchildren(context, 0);
-  set_mappings(context, (uint64_t*) 0); // cambio_2
+  set_mappings(context, (uint64_t*) 0);// cambio_2
   // se coloca dentro de init_context para que no se tenga que hacer un malloc cada vez que se crea un contexto
-
+  set_child_exit_ready(context, 0);
 }
 
 uint64_t* find_context(uint64_t* parent, uint64_t* vctxt) {
@@ -11351,6 +11723,7 @@ void block_context(uint64_t* context) {
 	N_BLOCKED_CONTEXTS = N_BLOCKED_CONTEXTS + 1;
 }
 
+/*
 void unblock_context(uint64_t* context) {
 	if (blocked_contexts == (uint64_t*) 0) {
 		printf("%s: Attempting to unblock a non-blocked context!", selfie_name);
@@ -11365,14 +11738,48 @@ void unblock_context(uint64_t* context) {
 		set_prev_context(context, (uint64_t*) 0);
 	}
 
-	set_prev_context(used_contexts, context);
-	set_next_context(context, used_contexts);
-	used_contexts = context;
+set_prev_context(context, (uint64_t*) 0);
+set_next_context(context, used_contexts);
+
+if (used_contexts != (uint64_t*) 0)
+  set_prev_context(used_contexts, context);
+
+used_contexts = context;
 
 	set_status(context, STATUS_READY);
 	N_BLOCKED_CONTEXTS = N_BLOCKED_CONTEXTS - 1;
 }
+*/
+void unblock_context(uint64_t* context) {
+  if (context == (uint64_t*) 0)
+    return;
 
+  // quitar de blocked_contexts
+  if (get_next_context(context) != (uint64_t*) 0)
+    set_prev_context(get_next_context(context), get_prev_context(context));
+
+  if (get_prev_context(context) != (uint64_t*) 0)
+    set_next_context(get_prev_context(context), get_next_context(context));
+  else
+    blocked_contexts = get_next_context(context);
+
+  set_prev_context(context, (uint64_t*) 0);
+  set_next_context(context, (uint64_t*) 0);
+
+  if (N_BLOCKED_CONTEXTS > 0)
+    N_BLOCKED_CONTEXTS = N_BLOCKED_CONTEXTS - 1;
+
+  // insertar al inicio de used_contexts
+  set_prev_context(context, (uint64_t*) 0);
+  set_next_context(context, used_contexts);
+
+  if (used_contexts != (uint64_t*) 0)
+    set_prev_context(used_contexts, context);
+
+  used_contexts = context;
+
+  set_status(context, STATUS_READY);
+}
 // -----------------------------------------------------------------
 // -------------------------- MICROKERNEL --------------------------
 // -----------------------------------------------------------------
@@ -11479,7 +11886,7 @@ uint64_t* create_mapping_entry(uint64_t addr,
 }
 
 void add_mapping(uint64_t* context, uint64_t* mapping) {
-  set_next_mapping(mapping, get_mappings(context));
+  set_next_mapping(mapping, (uint64_t*) get_mappings(context)); 
   set_mappings(context, mapping);
 }
 
@@ -11488,7 +11895,7 @@ void add_mapping(uint64_t* context, uint64_t* mapping) {
 uint64_t* find_mapping_by_addr(uint64_t* context, uint64_t addr) {
   uint64_t* mapping;
 
-  mapping = get_mappings(context);
+  mapping = (uint64_t*) get_mappings(context);
 
   while (mapping != (uint64_t*) 0) {
     if (get_mapping_addr(mapping) == addr)
@@ -11505,7 +11912,7 @@ uint64_t* find_mapping_containing_address(uint64_t* context, uint64_t vaddr) { /
   uint64_t start;
   uint64_t end;
 
-  mapping = get_mappings(context);
+  mapping = (uint64_t*) get_mappings(context);
 
   while (mapping != (uint64_t*) 0) {
     start = get_mapping_addr(mapping);
@@ -11545,8 +11952,11 @@ fork    -> saber qué páginas pertenecen a mappings compartidos
 
 uint64_t PAGECACHEENTRIES = 4;
 
+// cambio_3
 uint64_t* page_cache = (uint64_t*) 0; // cabeza de la lisa global, ya que la tabla es único para todos los procesos.
 // podemos lograr saber la página del archivo 3 en offset 4096 está guardada en el frame 0x800000
+// este page se encuentra en esa direccion de memoria, de tal manera que podamos sacar un bloque del frame de forma directa
+// a partir de ese page, sin tener que buscar en la lista de page cache entries
 
 // page cache entry
 // +---+-------------+
@@ -11554,11 +11964,14 @@ uint64_t* page_cache = (uint64_t*) 0; // cabeza de la lisa global, ya que la tab
 // | 1 | file id     |
 // | 2 | file offset |
 // | 3 | frame       |
+// cambio, agregar atributo page de tal manera que 
+// podamos acceder directamente a un frame con un page en específico.
 // +---+-------------+
 
 uint64_t* allocate_page_cache_entry() {
   return zmalloc(PAGECACHEENTRIES * sizeof(uint64_t));
-} // reservamos memoria para una entrada de la cache de paginas, que tiene 4 campos, cada uno de 8 bytes (uint64_t)
+} // reservamos memoria para una entrada de la cache de paginas, cada uno de 8 bytes (uint64_t)
+// la memoria reservada se encuentra en la memoria virtual del proceso, y es inicializada en 0 por zmalloc
 
 uint64_t* get_next_page_cache_entry(uint64_t* entry) {
   return (uint64_t*) *entry;
@@ -11631,6 +12044,7 @@ uint64_t* create_page_cache_entry(uint64_t file_id,
 // ----------------------- FILE IDENTIFIERS ------------------------
 // -----------------------------------------------------------------
 
+// cambio_3
 uint64_t FDFILEENTRIES = 4;
 
 uint64_t* fd_file_table = (uint64_t*) 0; // cabeza de la lista global, ya que la tabla es única para todos los procesos.
@@ -11756,6 +12170,152 @@ uint64_t get_file_id_from_fd(uint64_t fd) { // dado un file descriptor (fd), est
     return 0;
 }
 
+
+// ----------------------------------------------------------------------
+// -----------------------------------------------------------------
+// -------------------------- MMAP HELPERS -------------------------
+// -----------------------------------------------------------------
+
+uint64_t is_valid_mmap_prot(uint64_t prot) {
+  if (prot == PROT_READ)
+    return 1;
+  else if (prot == PROT_WRITE)
+    return 1;
+  else if (prot == PROT_READ_WRITE)
+    return 1;
+  else
+    return 0;
+}
+
+uint64_t mapping_allows_read(uint64_t* mapping) {
+  uint64_t prot;
+
+  prot = get_mapping_prot(mapping);
+
+  if (prot == PROT_READ)
+    return 1;
+  else if (prot == PROT_READ_WRITE)
+    return 1;
+  else
+    return 0;
+}
+
+uint64_t mapping_allows_write(uint64_t* mapping) {
+  uint64_t prot;
+
+  prot = get_mapping_prot(mapping);
+
+  if (prot == PROT_WRITE)
+    return 1;
+  else if (prot == PROT_READ_WRITE)
+    return 1;
+  else
+    return 0;
+}
+
+uint64_t mmap_regions_overlap(uint64_t start1,
+                              uint64_t length1,
+                              uint64_t start2,
+                              uint64_t length2) {
+  uint64_t end1;
+  uint64_t end2;
+
+  end1 = start1 + length1;
+  end2 = start2 + length2;
+
+  if (start1 < end2)
+    if (start2 < end1)
+      return 1;
+
+  return 0;
+}
+
+uint64_t region_collides_with_existing_mapping(uint64_t* context,
+                                               uint64_t addr,
+                                               uint64_t length) {
+  uint64_t* mapping;
+
+  mapping = get_mappings(context);
+
+  while (mapping != (uint64_t*) 0) {
+    if (mmap_regions_overlap(addr,
+                             length,
+                             get_mapping_addr(mapping),
+                             get_mapping_length(mapping)))
+      return 1;
+
+    mapping = get_next_mapping(mapping);
+  }
+
+  return 0;
+}
+
+uint64_t is_region_free_for_mmap(uint64_t* context,
+                                 uint64_t addr,
+                                 uint64_t length) {
+  uint64_t end;
+
+  end = addr + length;
+
+  // overflow
+  if (end < addr)
+    return 0;
+
+  // no debe caer encima de code/data/heap
+  if (addr < get_program_break(context))
+    return 0;
+
+  // no debe chocar con el stack actual
+  if (end > *(get_regs(context) + REG_SP))
+    return 0;
+
+  // no debe chocar con otro mapping del mismo proceso
+  if (region_collides_with_existing_mapping(context, addr, length))
+    return 0;
+
+  return 1;
+}
+
+uint64_t find_free_mmap_region(uint64_t* context, uint64_t length) {
+  uint64_t addr;
+  uint64_t heap_end;
+
+  addr = MMAPBASE;
+
+  heap_end = round_up(get_program_break(context), PAGESIZE);
+
+  if (addr < heap_end)
+    addr = heap_end;
+
+  while (is_region_free_for_mmap(context, addr, length) == 0) {
+    addr = addr + length;
+
+    // overflow
+    if (addr < MMAPBASE)
+      return 0;
+
+    if (addr + length < addr)
+      return 0;
+
+    if (addr + length > *(get_regs(context) + REG_SP))
+      return 0;
+  }
+
+  return addr;
+}
+
+void mmap_return_error(uint64_t* context) {
+  *(get_regs(context) + REG_A0) = sign_shrink(-1, SYSCALL_BITWIDTH);
+
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+}
+
+void msync_return_error(uint64_t* context) {
+  *(get_regs(context) + REG_A0) = sign_shrink(-1, SYSCALL_BITWIDTH);
+
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 uint64_t* create_context(uint64_t* parent, uint64_t* vctxt) {
   uint64_t* context;
@@ -11879,6 +12439,86 @@ void map_page(uint64_t* context, uint64_t page, uint64_t frame) {
 
 // ------------------------------------------------------
 // cambio_9
+void map_mmap_page(uint64_t* context, uint64_t page, uint64_t frame) {
+  uint64_t* table;
+
+  if (frame != 0) {
+    table = get_pt(context);
+
+    set_PTE_for_page(table, page, frame);
+  }
+
+  if (debug_map)
+    printf("%s: mmap page 0x%04lX mapped to shared frame 0x%08lX in context %s\n",
+      selfie_name, page, (uint64_t) frame, get_name(context));
+}
+
+void copy_mappings(uint64_t* parent, uint64_t* child) {
+  uint64_t* mapping;
+  uint64_t* copy;
+
+  mapping = get_mappings(parent);
+
+  while (mapping != (uint64_t*) 0) {
+    copy = create_mapping_entry(get_mapping_addr(mapping),
+                                get_mapping_length(mapping),
+                                get_mapping_prot(mapping),
+                                get_mapping_fd(mapping),
+                                get_mapping_file_id(mapping),
+                                get_mapping_offset(mapping));
+
+    add_mapping(child, copy);
+
+    mapping = get_next_mapping(mapping);
+  }
+}
+
+void map_shared_mappings_after_fork(uint64_t* parent, uint64_t* child) {
+  uint64_t* mapping;
+  uint64_t pages;
+  uint64_t i;
+  uint64_t vaddr;
+  uint64_t page;
+  uint64_t frame;
+
+  mapping = get_mappings(parent);
+
+  while (mapping != (uint64_t*) 0) {
+    pages = get_mapping_length(mapping) / PAGESIZE;
+
+    i = 0;
+
+    while (i < pages) {
+      vaddr = get_mapping_addr(mapping) + i * PAGESIZE;
+      page  = get_page_of_virtual_address(vaddr);
+
+      frame = get_frame_for_page(get_pt(parent), page);
+
+      if (frame != 0)
+        map_mmap_page(child, page, frame);
+
+      i = i + 1;
+    }
+
+    mapping = get_next_mapping(mapping);
+  }
+}
+
+// UMMAP
+void unmap_mmap_page(uint64_t* context, uint64_t page) {
+  uint64_t* table;
+
+  table = get_pt(context);
+
+  if (get_frame_for_page(table, page) != 0)
+    set_PTE_for_page(table, page, 0);
+
+  if (debug_map)
+    printf("%s: mmap page 0x%04lX unmapped in context %s\n",
+      selfie_name, page, get_name(context));
+}/////////////////////////////
+
+
 uint64_t map_mmap_page_to_cache_frame(uint64_t* context,
                                       uint64_t vaddr,
                                       uint64_t frame) {
@@ -12077,11 +12717,15 @@ uint64_t is_data_stack_heap_address(uint64_t* context, uint64_t vaddr) {
     return 1;
   else if (is_heap_address(context, vaddr))
     return 1;
+  else if (is_mapped_address(context, vaddr))
+    return 1;
   else
     return 0;
 }
 
 uint64_t is_valid_segment_read(uint64_t vaddr) {
+  uint64_t* mapping;
+
   if (is_data_address(current_context, vaddr)) {
     data_reads = data_reads + 1;
 
@@ -12094,11 +12738,53 @@ uint64_t is_valid_segment_read(uint64_t vaddr) {
     heap_reads = heap_reads + 1;
 
     return 1;
-  } else
+  } else {
+    mapping = find_mapping_containing_address(current_context, vaddr);
+
+    if (mapping != (uint64_t*) 0)
+      if (mapping_allows_read(mapping))
+        return 1;
+
     return 0;
+  }
 }
 
+uint64_t* remove_mapping_by_addr(uint64_t* context, uint64_t addr) {
+  uint64_t* previous;
+  uint64_t* current;
+
+  previous = (uint64_t*) 0;
+  current  = get_mappings(context);
+
+  while (current != (uint64_t*) 0) {
+    if (get_mapping_addr(current) == addr) {
+      if (previous == (uint64_t*) 0)
+        set_mappings(context, get_next_mapping(current));
+      else
+        set_next_mapping(previous, get_next_mapping(current));
+
+      set_next_mapping(current, (uint64_t*) 0);
+
+      return current;
+    }
+
+    previous = current;
+    current  = get_next_mapping(current);
+  }
+
+  return (uint64_t*) 0;
+}
+
+void munmap_return_error(uint64_t* context) {
+  *(get_regs(context) + REG_A0) = sign_shrink(-1, SYSCALL_BITWIDTH);
+
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+}
+
+
 uint64_t is_valid_segment_write(uint64_t vaddr) {
+  uint64_t* mapping;
+
   if (is_data_address(current_context, vaddr)) {
     data_writes = data_writes + 1;
 
@@ -12111,10 +12797,16 @@ uint64_t is_valid_segment_write(uint64_t vaddr) {
     heap_writes = heap_writes + 1;
 
     return 1;
-  } else
-    return 0;
-}
+  } else {
+    mapping = find_mapping_containing_address(current_context, vaddr);
 
+    if (mapping != (uint64_t*) 0)
+      if (mapping_allows_write(mapping))
+        return 1;
+
+    return 0;
+  }
+}
 // -----------------------------------------------------------------
 // ---------------------------- KERNEL -----------------------------
 // -----------------------------------------------------------------
@@ -12214,6 +12906,37 @@ uint64_t read_file_page_into_frame(uint64_t fd, uint64_t file_offset, uint64_t* 
   return 1;
 }
 
+uint64_t write_frame_to_file_page(uint64_t fd,
+                                  uint64_t file_offset,
+                                  uint64_t* frame) {
+  uint64_t current_offset;
+  uint64_t bytes_written;
+
+  // Guardamos la posición actual del archivo.
+  current_offset = lseek(fd, 0, LSEEK_CUR);
+
+  if (current_offset == (uint64_t) -1)
+    return 0;
+
+  // Nos movemos al offset del archivo que corresponde a esta página.
+  if (lseek(fd, file_offset, LSEEK_SET) == (uint64_t) -1) {
+    lseek(fd, current_offset, LSEEK_SET);
+
+    return 0;
+  }
+
+  // Escribimos una página completa desde el cache frame.
+  bytes_written = write(fd, frame, PAGESIZE);
+
+  // Restauramos la posición original del archivo.
+  lseek(fd, current_offset, LSEEK_SET);
+
+  if (bytes_written != PAGESIZE)
+    return 0;
+
+  return 1;
+}
+
 uint64_t get_or_create_cache_frame(uint64_t file_id, uint64_t file_offset, uint64_t fd) {
   // esta función busca en la cache de páginas si ya existe un frame para el archivo con file_id y file_offset. Si existe, devuelve el frame. Si no existe, asigna un nuevo frame, lee la página del archivo en ese frame, crea una nueva entrada en la cache de páginas y devuelve el frame.
   uint64_t* entry;
@@ -12240,8 +12963,7 @@ uint64_t get_or_create_cache_frame(uint64_t file_id, uint64_t file_offset, uint6
 // -----------------------------------------------------------------
 // cambio_8
 
-uint64_t MMAPBASE = 2147483648; // 0x80000000 = 2GB
-uint64_t MMAPTOP  = 3221225472; // 0xC0000000 = 3GB, exclusive
+//------------------- GLOBAL VARIABLES PARA MMAP -------------------
 
 uint64_t is_page_aligned(uint64_t value) {
   if (value % PAGESIZE == 0)
@@ -12287,7 +13009,7 @@ uint64_t is_mmap_range_free(uint64_t* context, uint64_t addr, uint64_t length) {
   if (end > MMAPTOP)
     return 0;
 
-  mapping = get_mappings(context);
+  mapping = (uint64_t*) get_mappings(context);
 
   while (mapping != (uint64_t*) 0) {
     if (ranges_overlap(addr, length,
@@ -12500,6 +13222,12 @@ uint64_t handle_system_call(uint64_t* context) {
     implement_write(context);
   else if (a7 == SYSCALL_OPENAT)
     implement_openat(context);
+  else if (a7 == SYSCALL_MMAP)
+    implement_mmap(context);
+  else if (a7 == SYSCALL_MUNMAP)
+    implement_munmap(context);
+  else if (a7 == SYSCALL_MSYNC)
+    implement_msync(context);
   else if (a7 == SYSCALL_FORK)
     implement_fork(context);
   else if (a7 == SYSCALL_WAIT)

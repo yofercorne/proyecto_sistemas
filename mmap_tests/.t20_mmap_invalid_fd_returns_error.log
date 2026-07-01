@@ -1,0 +1,75 @@
+../selfie: ================================================================================
+../selfie: this is the selfie system from selfie.cs.uni-salzburg.at with
+../selfie: 64-bit unsigned integers and 64-bit pointers hosted on Linux
+../selfie: ================================================================================
+../selfie: selfie compiling tests/t20_mmap_invalid_fd_returns_error.c to 64-bit RISC-U with 64-bit starc
+../selfie: warning in tests/t20_mmap_invalid_fd_returns_error.c in line 5: type mismatch, uint64_t expected but uint64_t* found
+../selfie: --------------------------------------------------------------------------------
+../selfie: 198 characters read in 12 lines and 1 comments
+../selfie: with 99(50.00%) characters in 40 actual symbols
+../selfie: 0 global variables, 1 procedures, 0 string literals
+../selfie: 1 assignments, 0 while, 1 if, 3 calls, 0 return
+../selfie: --------------------------------------------------------------------------------
+../selfie: 12 symbol table lookups in 0 iterations on average
+../selfie: vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+../selfie: 624 bytes generated with 152 instructions and 16 bytes of data
+../selfie: --------------------------------------------------------------------------------
+../selfie: profile: instruction: total(ratio%)
+../selfie: init:    lui: 3(1.97%), addi: 67(44.08%)
+../selfie: memory:  ld: 27(17.76%), sd: 15(9.86%)
+../selfie: compute: add: 1(0.65%), sub: 3(1.97%), mul: 0(0.00%)
+../selfie: compute: divu: 0(0.00%), remu: 2(1.31%)
+../selfie: compare: sltu: 1(0.65%)
+../selfie: control: beq: 5(3.28%), jal: 4(2.63%), jalr: 11(7.23%)
+../selfie: system:  ecall: 13(8.55%)
+../selfie: --------------------------------------------------------------------------------
+../selfie: profile: data: total(bytes)
+../selfie: global variables:       1(8)
+../selfie: unique string literals: 0(0)
+../selfie: unique big integers:    1(8)
+../selfie: ********************************************************************************
+../selfie: 64-bit mipster executing 64-bit RISC-U binary tests/t20_mmap_invalid_fd_returns_error.c with 2MB physical memory
+../selfie: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
+../selfie: <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+../selfie: 64-bit mipster terminating 64-bit RISC-U binary tests/t20_mmap_invalid_fd_returns_error.c with exit code 0
+../selfie: --------------------------------------------------------------------------------
+../selfie: summary: 67 executed instructions in total [16.41% nops]
+../selfie:          0.02MB mapped memory [1.17% of 2MB physical memory]
+../selfie: --------------------------------------------------------------------------------
+../selfie: profile: instruction: total(ratio%)[nops%]
+../selfie: init:    lui: 3(4.47%)[0.00%], addi: 30(44.77%)[13.33%]
+../selfie: memory:  ld: 9(13.43%)[22.22%], sd: 12(17.91%)[33.33%]
+../selfie: compute: add: 0(0.00%)[0.00%], sub: 2(2.98%)[0.00%], mul: 0(0.00%)[0.00%]
+../selfie: compute: divu: 0(0.00%)[0.00%], remu: 1(1.49%)[0.00%]
+../selfie: compare: sltu: 1(1.49%)[100.00%]
+../selfie: control: beq: 1(1.49%)[0.00%], jal: 3(4.47%)[0.00%], jalr: 1(1.49%)[0.00%]
+../selfie: system:  ecall: 4(5.97%)
+../selfie: --------------------------------------------------------------------------------
+../selfie: profile: total,max(ratio%)@address(line#),2ndmax,3rdmax
+../selfie: calls:   3,1(33.33%)@0x54(~1),1(33.33%)@0xF4(~1),1(33.33%)@0x1B8(~5)
+../selfie: loops:   0,0(0.00%),0(0.00%),0(0.00%)
+../selfie: loads:   9,1(11.11%)@0x34(~1),1(11.11%)@0x54(~1),1(11.11%)@0xF4(~1)
+../selfie: stores:  12,1(8.33%)@0x30(~1),1(8.33%)@0x3C(~1),1(8.33%)@0x44(~1)
+../selfie: --------------------------------------------------------------------------------
+../selfie: CPU+memory:    reads+writes,reads,writes[reads/writes]
+../selfie: gp register:   3,2,1[2.00]
+../selfie: data segment:  2,1,1[1.00]
+../selfie: ra register:   5,2,3[0.66]
+../selfie: sp register:   44,31,13[2.38]
+../selfie: s0 register:   5,3,2[1.50]
+../selfie: stack total:   54,36,18[2.00]
+../selfie: stack segment: 19,8,11[0.72]
+../selfie: a0 register:   17,9,8[1.12]
+../selfie: a1 register:   2,1,1[1.00]
+../selfie: a2 register:   2,1,1[1.00]
+../selfie: a3 register:   2,1,1[1.00]
+../selfie: a4 register:   2,1,1[1.00]
+../selfie: a6 register:   5,0,5[0.00]
+../selfie: a7 register:   8,4,4[1.00]
+../selfie: args total:    38,17,21[0.80]
+../selfie: t0 register:   36,18,18[1.00]
+../selfie: t1 register:   2,1,1[1.00]
+../selfie: temps total:   38,19,19[1.00]
+../selfie: ################################################################################
